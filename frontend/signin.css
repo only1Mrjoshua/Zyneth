@@ -332,12 +332,14 @@ body {
 .toggle-password {
     position: absolute;
     right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
     background: none;
     border: none;
     color: var(--gray);
     cursor: pointer;
     font-size: 1.1rem;
-    padding: 0;
+    padding: 8px;
     width: 24px;
     height: 24px;
     display: flex;
@@ -345,6 +347,7 @@ body {
     justify-content: center;
     transition: var(--transition);
     z-index: 2;
+    outline: none;
 }
 
 .toggle-password:hover {
