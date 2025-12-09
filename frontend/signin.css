@@ -45,19 +45,28 @@ body {
 
 /* Navigation */
 .navbar {
-    position: relative;
+    position: fixed;
+    top: 0;
+    left: 0;
     width: 100%;
     background-color: rgba(10, 31, 68, 0.95);
     backdrop-filter: blur(10px);
     z-index: 1000;
     padding: 20px 0;
+    transition: var(--transition);
+}
+
+.navbar.scrolled {
+    padding: 15px 0;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
 }
 
 .nav-container {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
     padding: 0 20px;
 }
 
@@ -152,6 +161,7 @@ body {
     padding: 40px 20px;
     min-height: calc(100vh - 160px);
     width: 100%;
+    margin-top: 70px;
 }
 
 .signin-section {
