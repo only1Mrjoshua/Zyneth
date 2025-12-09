@@ -1,0 +1,1343 @@
+/* Reset and Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --primary: #FFD700;
+    --secondary: #0A1F44;
+    --accent: #1E3A8A;
+    --light: #F8FAFC;
+    --dark: #0F172A;
+    --gray: #64748B;
+    --light-gray: #E2E8F0;
+    --success: #10B981;
+    --error: #EF4444;
+    --transition: all 0.3s ease;
+    --shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family: 'Poppins', sans-serif;
+    line-height: 1.6;
+    color: var(--light);
+    background-color: var(--secondary);
+    overflow-x: hidden;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+.container {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+/* Navigation */
+.navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background-color: rgba(10, 31, 68, 0.95);
+    backdrop-filter: blur(10px);
+    z-index: 1000;
+    padding: 20px 0;
+    transition: var(--transition);
+}
+
+.navbar.scrolled {
+    padding: 15px 0;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+}
+
+.nav-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+.logo-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.logo-img {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.logo-img img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+.logo-text {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: var(--light);
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+.logo-text span {
+    color: var(--primary);
+}
+
+.nav-buttons {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.nav-link {
+    color: var(--light);
+    text-decoration: none;
+    font-weight: 500;
+    transition: var(--transition);
+    position: relative;
+    white-space: nowrap;
+}
+
+.nav-link:hover {
+    color: var(--primary);
+}
+
+.btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 25px;
+    border-radius: 50px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-decoration: none;
+    transition: var(--transition);
+    cursor: pointer;
+    background-color: transparent;
+    color: var(--primary);
+    border: 2px solid var(--primary);
+    font-family: 'Poppins', sans-serif;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.btn-secondary:hover {
+    background-color: rgba(255, 215, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+/* Main Content */
+.signup-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    min-height: calc(100vh - 160px);
+    width: 100%;
+    margin-top: 70px;
+}
+
+.signup-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 60px;
+    max-width: 1200px;
+    width: 100%;
+    align-items: center;
+}
+
+.signup-wrapper {
+    background-color: rgba(15, 23, 42, 0.8);
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: var(--shadow-lg);
+    border: 1px solid rgba(255, 215, 0, 0.1);
+    animation: fadeInUp 0.8s ease-out;
+    width: 100%;
+}
+
+.signup-header {
+    text-align: center;
+    margin-bottom: 30px;
+    width: 100%;
+}
+
+.signup-header h1 {
+    font-size: 2.5rem;
+    color: var(--light);
+    margin-bottom: 10px;
+    line-height: 1.2;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.signup-subtitle {
+    color: var(--light-gray);
+    font-size: 1.1rem;
+    font-family: 'Inter', sans-serif;
+    line-height: 1.5;
+}
+
+/* Google Sign-up */
+.google-signup-container {
+    margin-bottom: 30px;
+    width: 100%;
+}
+
+.btn-google {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+    padding: 16px 24px;
+    background-color: #4285F4;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: var(--transition);
+    box-shadow: 0 4px 12px rgba(66, 133, 244, 0.3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.btn-google:hover {
+    background-color: #3367D6;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(66, 133, 244, 0.4);
+}
+
+.btn-google i {
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.divider {
+    display: flex;
+    align-items: center;
+    margin: 20px 0;
+    color: var(--gray);
+    font-size: 0.9rem;
+    width: 100%;
+}
+
+.divider::before,
+.divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.divider span {
+    padding: 0 15px;
+    white-space: nowrap;
+}
+
+/* Form Styles */
+.signup-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    width: 100%;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+}
+
+.form-group label {
+    font-weight: 500;
+    color: var(--light);
+    font-size: 0.95rem;
+}
+
+.input-with-icon {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.input-with-icon i {
+    position: absolute;
+    left: 16px;
+    color: var(--gray);
+    font-size: 1.1rem;
+    z-index: 1;
+    pointer-events: none;
+}
+
+.input-with-icon input {
+    width: 100%;
+    padding: 16px 48px 16px 48px;
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    color: var(--light);
+    font-family: 'Inter', sans-serif;
+    font-size: 1rem;
+    transition: var(--transition);
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.input-with-icon input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.1);
+}
+
+.input-with-icon input::placeholder {
+    color: var(--gray);
+}
+
+.toggle-password {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--gray);
+    cursor: pointer;
+    font-size: 1.1rem;
+    padding: 8px 16px;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+    z-index: 2;
+    outline: none;
+}
+
+.toggle-password:hover {
+    color: var(--primary);
+}
+
+.error-message {
+    color: var(--error);
+    font-size: 0.85rem;
+    min-height: 20px;
+    font-family: 'Inter', sans-serif;
+    margin-top: 4px;
+    word-wrap: break-word;
+}
+
+/* Form Options */
+.form-options {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 10px 0;
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.remember-me {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    height: 24px;
+}
+
+.remember-me input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--primary);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.remember-me label {
+    color: var(--light-gray);
+    font-size: 0.9rem;
+    cursor: pointer;
+    user-select: none;
+    white-space: normal;
+    word-wrap: break-word;
+    flex: 1;
+}
+
+/* Sign-up Button */
+.btn-signup {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    padding: 18px 24px;
+    background-color: var(--primary);
+    color: var(--secondary);
+    border: none;
+    border-radius: 12px;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 700;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: var(--transition);
+    box-shadow: 0 5px 15px rgba(255, 215, 0, 0.3);
+    margin-top: 10px;
+    white-space: nowrap;
+}
+
+.btn-signup:hover {
+    background-color: #FFE44D;
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(255, 215, 0, 0.4);
+}
+
+.btn-signup:active {
+    transform: translateY(-1px);
+}
+
+.btn-signup i {
+    font-size: 1.1rem;
+    transition: var(--transition);
+    flex-shrink: 0;
+}
+
+.btn-signup:hover i {
+    transform: translateX(4px);
+}
+
+/* Login Link */
+.login-link {
+    text-align: center;
+    margin-top: 25px;
+    padding-top: 25px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    width: 100%;
+}
+
+.login-link p {
+    color: var(--light-gray);
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.login-link a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 600;
+    transition: var(--transition);
+}
+
+.login-link a:hover {
+    text-decoration: underline;
+}
+
+/* Security Info */
+.security-info {
+    margin-top: 20px;
+    text-align: center;
+    width: 100%;
+}
+
+.secure-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background-color: rgba(16, 185, 129, 0.1);
+    color: var(--success);
+    padding: 10px 18px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    flex-shrink: 0;
+    max-width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.secure-badge i {
+    font-size: 0.9rem;
+    flex-shrink: 0;
+}
+
+/* Benefits Panel */
+.benefits-panel {
+    background-color: rgba(15, 23, 42, 0.8);
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: var(--shadow-lg);
+    border: 1px solid rgba(255, 215, 0, 0.1);
+    animation: fadeInRight 0.8s ease-out;
+    width: 100%;
+}
+
+.benefits-header {
+    text-align: center;
+    margin-bottom: 40px;
+    width: 100%;
+}
+
+.benefits-header h2 {
+    font-size: 2rem;
+    color: var(--light);
+    margin-bottom: 10px;
+    line-height: 1.2;
+    word-wrap: break-word;
+}
+
+.benefits-header p {
+    color: var(--light-gray);
+    font-size: 1.1rem;
+    font-family: 'Inter', sans-serif;
+    line-height: 1.5;
+}
+
+.benefits-list {
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
+    width: 100%;
+}
+
+.benefit-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 15px;
+    width: 100%;
+}
+
+.benefit-icon {
+    width: 50px;
+    height: 50px;
+    background-color: rgba(255, 215, 0, 0.1);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    color: var(--primary);
+    flex-shrink: 0;
+}
+
+.benefit-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.benefit-content h3 {
+    font-size: 1.1rem;
+    color: var(--light);
+    margin-bottom: 5px;
+    word-wrap: break-word;
+}
+
+.benefit-content p {
+    color: var(--light-gray);
+    font-size: 0.9rem;
+    line-height: 1.5;
+    font-family: 'Inter', sans-serif;
+    word-wrap: break-word;
+}
+
+/* Footer */
+.footer {
+    background-color: var(--dark);
+    padding-top: 40px;
+    padding-bottom: 30px;
+    margin-top: auto;
+    margin-bottom: 40px;
+    width: 100%;
+}
+
+.footer-bottom {
+    padding-top: 30px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    text-align: center;
+    width: 100%;
+}
+
+.footer-bottom p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--light-gray);
+    line-height: 1.5;
+}
+
+.footer-extra {
+    display: flex;
+    align-items: center;
+    gap: 25px;
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 100%;
+}
+
+.footer-extra a {
+    color: var(--light-gray);
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: var(--transition);
+    white-space: nowrap;
+}
+
+.footer-extra a:hover {
+    color: var(--primary);
+}
+
+/* Animations */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeInRight {
+    from {
+        opacity: 0;
+        transform: translateX(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+    20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+
+.shake {
+    animation: shake 0.5s ease-in-out;
+}
+
+/* Password Strength Indicator */
+.password-strength {
+    margin-top: 5px;
+    height: 4px;
+    background-color: var(--light-gray);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.strength-bar {
+    height: 100%;
+    width: 0%;
+    transition: var(--transition);
+}
+
+.strength-weak {
+    background-color: var(--error);
+    width: 33%;
+}
+
+.strength-medium {
+    background-color: #FFA500;
+    width: 66%;
+}
+
+.strength-strong {
+    background-color: var(--success);
+    width: 100%;
+}
+
+/* Validation Styles */
+.input-with-icon.success input {
+    border-color: var(--success);
+}
+
+.input-with-icon.error input {
+    border-color: var(--error);
+}
+
+/* ==============================
+   RESPONSIVE DESIGN
+   ============================== */
+
+/* Extra Large Screens - 1440px and above */
+@media (min-width: 1440px) {
+    .container {
+        max-width: 1400px;
+    }
+}
+
+/* Large Screens - 1200px to 1439px */
+@media (max-width: 1200px) {
+    .signup-section {
+        gap: 40px;
+    }
+    
+    .signup-wrapper,
+    .benefits-panel {
+        padding: 35px 30px;
+    }
+    
+    .input-with-icon input {
+        padding: 16px 48px 16px 48px;
+    }
+    
+    .toggle-password {
+        right: 16px;
+    }
+}
+
+/* Tablet Landscape - 1024px to 1199px */
+@media (max-width: 1024px) {
+    .signup-header h1 {
+        font-size: 2.2rem;
+    }
+    
+    .benefits-header h2 {
+        font-size: 1.8rem;
+    }
+    
+    .signup-wrapper,
+    .benefits-panel {
+        padding: 30px 25px;
+    }
+    
+    .benefit-item {
+        gap: 12px;
+    }
+    
+    .benefit-icon {
+        width: 45px;
+        height: 45px;
+        font-size: 1.2rem;
+    }
+    
+    .input-with-icon input {
+        padding: 16px 48px 16px 48px;
+    }
+    
+    .toggle-password {
+        right: 16px;
+    }
+}
+
+/* Tablet Portrait - 768px to 1023px */
+@media (max-width: 768px) {
+    .signup-section {
+        grid-template-columns: 1fr;
+        gap: 40px;
+        max-width: 600px;
+    }
+    
+    .signup-container {
+        padding: 30px 15px;
+        min-height: auto;
+    }
+    
+    .nav-container {
+        padding: 0 15px;
+    }
+    
+    .logo-text {
+        font-size: 1.5rem;
+    }
+    
+    .nav-buttons {
+        gap: 15px;
+    }
+    
+    .btn-secondary {
+        padding: 8px 20px;
+        font-size: 0.85rem;
+    }
+    
+    .signup-header h1 {
+        font-size: 2rem;
+        margin-bottom: 8px;
+    }
+    
+    .signup-subtitle {
+        font-size: 1rem;
+    }
+    
+    .benefits-header h2 {
+        font-size: 1.6rem;
+    }
+    
+    .benefits-header p {
+        font-size: 1rem;
+    }
+    
+    .input-with-icon input {
+        padding: 16px 48px 16px 48px;
+    }
+    
+    .toggle-password {
+        right: 16px;
+    }
+    
+    .form-options {
+        flex-direction: row;
+        justify-content: space-between;
+        gap: 10px;
+        align-items: center;
+    }
+    
+    .footer-bottom {
+        gap: 15px;
+    }
+    
+    .footer-extra {
+        gap: 20px;
+    }
+}
+
+/* Mobile Large - 480px to 767px */
+@media (max-width: 480px) {
+    body {
+        font-size: 15px;
+    }
+    
+    .container {
+        padding: 0 15px;
+    }
+    
+    .nav-container {
+        padding: 0 12px;
+    }
+    
+    .logo-text {
+        font-size: 1.3rem;
+    }
+    
+    .logo-img {
+        width: 35px;
+        height: 35px;
+    }
+    
+    .nav-buttons {
+        gap: 10px;
+    }
+    
+    .nav-link {
+        font-size: 0.9rem;
+    }
+    
+    .btn-secondary {
+        padding: 6px 15px;
+        font-size: 0.8rem;
+    }
+    
+    .signup-container {
+        padding: 25px 12px;
+    }
+    
+    .signup-wrapper,
+    .benefits-panel {
+        padding: 25px 20px;
+        border-radius: 16px;
+    }
+    
+    .signup-header {
+        margin-bottom: 25px;
+    }
+    
+    .signup-header h1 {
+        font-size: 1.7rem;
+    }
+    
+    .signup-subtitle {
+        font-size: 0.95rem;
+    }
+    
+    .google-signup-container {
+        margin-bottom: 25px;
+    }
+    
+    .btn-google,
+    .btn-signup {
+        padding: 14px 20px;
+        font-size: 0.95rem;
+        border-radius: 10px;
+    }
+    
+    .divider {
+        margin: 15px 0;
+        font-size: 0.85rem;
+    }
+    
+    .divider span {
+        padding: 0 12px;
+    }
+    
+    .signup-form {
+        gap: 15px;
+    }
+    
+    .form-group label {
+        font-size: 0.9rem;
+    }
+    
+    .input-with-icon i {
+        left: 14px;
+        font-size: 1rem;
+    }
+    
+    .input-with-icon input {
+        padding: 14px 44px 14px 44px;
+        font-size: 0.95rem;
+        border-radius: 10px;
+    }
+    
+    .toggle-password {
+        right: 14px;
+        font-size: 1rem;
+        width: 20px;
+        height: 20px;
+    }
+    
+    .form-options {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        margin: 5px 0 15px;
+    }
+    
+    .remember-me label {
+        font-size: 0.85rem;
+    }
+    
+    .btn-signup {
+        padding: 16px 20px;
+        font-size: 0.95rem;
+        border-radius: 10px;
+    }
+    
+    .login-link {
+        margin-top: 20px;
+        padding-top: 20px;
+    }
+    
+    .login-link p {
+        font-size: 0.9rem;
+    }
+    
+    .security-info {
+        margin-top: 15px;
+    }
+    
+    .secure-badge {
+        padding: 8px 14px;
+        font-size: 0.85rem;
+    }
+    
+    .benefits-header {
+        margin-bottom: 30px;
+    }
+    
+    .benefits-header h2 {
+        font-size: 1.4rem;
+    }
+    
+    .benefits-header p {
+        font-size: 0.95rem;
+    }
+    
+    .benefits-list {
+        gap: 20px;
+    }
+    
+    .benefit-item {
+        flex-direction: column;
+        text-align: center;
+        align-items: center;
+        gap: 12px;
+    }
+    
+    .benefit-icon {
+        width: 45px;
+        height: 45px;
+        font-size: 1.2rem;
+    }
+    
+    .benefit-content h3 {
+        font-size: 1rem;
+        text-align: center;
+    }
+    
+    .benefit-content p {
+        font-size: 0.85rem;
+        text-align: center;
+    }
+    
+    .footer {
+        padding-top: 30px;
+        padding-bottom: 25px;
+    }
+    
+    .footer-bottom {
+        padding-top: 25px;
+        gap: 15px;
+    }
+    
+    .footer-bottom p {
+        font-size: 0.85rem;
+    }
+    
+    .footer-extra {
+        flex-direction: column;
+        gap: 12px;
+    }
+    
+    .footer-extra a {
+        font-size: 0.85rem;
+    }
+}
+
+/* Mobile Small - 375px to 479px */
+@media (max-width: 375px) {
+    .logo-text {
+        font-size: 1.2rem;
+    }
+    
+    .logo-img {
+        width: 32px;
+        height: 32px;
+    }
+    
+    .nav-link {
+        font-size: 0.85rem;
+    }
+    
+    .btn-secondary {
+        padding: 5px 12px;
+        font-size: 0.75rem;
+    }
+    
+    .signup-header h1 {
+        font-size: 1.5rem;
+    }
+    
+    .signup-subtitle {
+        font-size: 0.9rem;
+    }
+    
+    .btn-google,
+    .btn-signup {
+        padding: 12px 16px;
+        font-size: 0.9rem;
+    }
+    
+    .input-with-icon input {
+        padding: 12px 40px 12px 40px;
+        font-size: 0.9rem;
+    }
+    
+    .input-with-icon i {
+        left: 12px;
+        font-size: 0.95rem;
+    }
+    
+    .toggle-password {
+        right: 12px;
+        font-size: 0.95rem;
+        width: 18px;
+        height: 18px;
+    }
+    
+    .form-options {
+        flex-direction: row;
+        justify-content: space-between;
+        gap: 8px;
+        align-items: center;
+    }
+    
+    .remember-me {
+        align-items: center;
+        flex-shrink: 1;
+    }
+    
+    .remember-me label {
+        font-size: 0.8rem;
+    }
+    
+    .benefits-header h2 {
+        font-size: 1.3rem;
+    }
+    
+    .benefits-header p {
+        font-size: 0.9rem;
+    }
+    
+    .benefit-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 1.1rem;
+    }
+    
+    .benefit-content h3 {
+        font-size: 0.95rem;
+    }
+    
+    .benefit-content p {
+        font-size: 0.8rem;
+    }
+}
+
+/* Mobile Extra Small - 320px to 374px */
+@media (max-width: 320px) {
+    .container,
+    .nav-container {
+        padding: 0 10px;
+    }
+    
+    .logo-text {
+        font-size: 1.1rem;
+    }
+    
+    .logo-img {
+        width: 30px;
+        height: 30px;
+    }
+    
+    .nav-buttons {
+        gap: 8px;
+    }
+    
+    .nav-link {
+        font-size: 0.8rem;
+    }
+    
+    .signup-container {
+        padding: 20px 10px;
+    }
+    
+    .signup-wrapper,
+    .benefits-panel {
+        padding: 20px 15px;
+        border-radius: 14px;
+    }
+    
+    .signup-header h1 {
+        font-size: 1.3rem;
+    }
+    
+    .signup-subtitle {
+        font-size: 0.85rem;
+    }
+    
+    .btn-google,
+    .btn-signup {
+        padding: 10px 14px;
+        font-size: 0.85rem;
+    }
+    
+    .divider {
+        font-size: 0.8rem;
+    }
+    
+    .divider span {
+        padding: 0 8px;
+    }
+    
+    .form-group label {
+        font-size: 0.85rem;
+    }
+    
+    .input-with-icon input {
+        padding: 10px 38px 10px 38px;
+        font-size: 0.85rem;
+    }
+    
+    .input-with-icon i {
+        left: 10px;
+        font-size: 0.9rem;
+    }
+    
+    .toggle-password {
+        right: 10px;
+        font-size: 0.9rem;
+        width: 16px;
+        height: 16px;
+    }
+    
+    .form-options {
+        flex-direction: row;
+        justify-content: space-between;
+        gap: 6px;
+        align-items: center;
+    }
+    
+    .remember-me {
+        flex: 1;
+        min-width: 0;
+        align-items: center;
+    }
+    
+    .remember-me label {
+        font-size: 0.75rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    
+    .login-link p {
+        font-size: 0.85rem;
+    }
+    
+    .secure-badge {
+        padding: 6px 12px;
+        font-size: 0.8rem;
+    }
+    
+    .benefits-header h2 {
+        font-size: 1.2rem;
+    }
+    
+    .benefits-header p {
+        font-size: 0.85rem;
+    }
+    
+    .benefits-list {
+        gap: 15px;
+    }
+    
+    .benefit-item {
+        gap: 10px;
+    }
+    
+    .benefit-icon {
+        width: 35px;
+        height: 35px;
+        font-size: 1rem;
+    }
+    
+    .benefit-content h3 {
+        font-size: 0.9rem;
+    }
+    
+    .benefit-content p {
+        font-size: 0.75rem;
+    }
+    
+    .footer {
+        padding-top: 25px;
+        padding-bottom: 20px;
+    }
+    
+    .footer-bottom {
+        padding-top: 20px;
+        gap: 12px;
+    }
+    
+    .footer-bottom p {
+        font-size: 0.8rem;
+    }
+    
+    .footer-extra {
+        gap: 10px;
+    }
+    
+    .footer-extra a {
+        font-size: 0.8rem;
+    }
+}
+
+/* Loading State */
+.btn-signup.loading {
+    position: relative;
+    color: transparent;
+}
+
+.btn-signup.loading::after {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(10, 31, 68, 0.3);
+    border-top-color: var(--secondary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Utility Classes for Text Overflow */
+.text-truncate {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.word-break {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+/* Prevent Horizontal Overflow */
+* {
+    max-width: 100%;
+}
+
+img, video, canvas {
+    max-width: 100%;
+    height: auto;
+}
+
+/* Touch-friendly Tap Targets */
+@media (max-width: 768px) {
+    .btn-google,
+    .btn-signup,
+    .btn-secondary,
+    .toggle-password,
+    .remember-me label,
+    .login-link a {
+        min-height: 44px;
+        min-width: 44px;
+    }
+    
+    .remember-me input[type="checkbox"] {
+        min-width: 20px;
+        min-height: 20px;
+    }
+}

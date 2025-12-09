@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sign Up | Your Platform</title>
+    <link rel="stylesheet" href="signup.css" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+  </head>
+  <body>
+    <!-- Navigation -->
+    <nav class="navbar">
+      <div class="nav-container">
+        <div class="logo-wrapper">
+          <div class="logo-img">
+            <img src="images/price pulse.png" alt="PricePulse Logo" />
+          </div>
+          <a href="index.html" class="logo-text">Price<span>Pulse</span></a>
+        </div>
+        <div class="nav-buttons">
+          <a href="about.html" class="nav-link">About</a>
+          <a href="features.html" class="nav-link">Features</a>
+          <a href="signin.html" class="btn-secondary">Sign In</a>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="signup-container">
+      <div class="signup-section">
+        <!-- Sign Up Form -->
+        <div class="signup-wrapper">
+          <div class="signup-header">
+            <h1>Create Your Account</h1>
+            <p class="signup-subtitle">
+              Join thousands of users who trust our platform
+            </p>
+          </div>
+
+          <!-- Google Sign Up -->
+          <div class="google-signup-container">
+            <button type="button" class="btn-google" id="googleSignupBtn">
+              <i class="fab fa-google"></i>
+              <span>Sign up with Google</span>
+            </button>
+          </div>
+
+          <div class="divider">
+            <span>Or continue with email</span>
+          </div>
+
+          <!-- Sign Up Form -->
+          <form class="signup-form" id="signupForm">
+            <!-- Full Name -->
+            <div class="form-group">
+              <label for="fullName">Full Name</label>
+              <div class="input-with-icon">
+                <i class="fas fa-user"></i>
+                <input
+                  type="text"
+                  id="fullName"
+                  name="fullName"
+                  placeholder="Enter your full name"
+                  required
+                />
+              </div>
+              <div class="error-message" id="fullNameError"></div>
+            </div>
+
+            <!-- Username -->
+            <div class="form-group">
+              <label for="username">Username</label>
+              <div class="input-with-icon">
+                <i class="fas fa-at"></i>
+                <input
+                  type="text"
+                  id="username"
+                  name="username"
+                  placeholder="Choose a username"
+                  required
+                />
+              </div>
+              <div class="error-message" id="usernameError"></div>
+            </div>
+
+            <!-- Email -->
+            <div class="form-group">
+              <label for="email">Email Address</label>
+              <div class="input-with-icon">
+                <i class="fas fa-envelope"></i>
+                <input
+                  type="email"
+                  id="email"
+                  name="email"
+                  placeholder="Enter your email"
+                  required
+                />
+              </div>
+              <div class="error-message" id="emailError"></div>
+            </div>
+
+            <!-- Password -->
+            <div class="form-group">
+              <label for="password">Password</label>
+              <div class="input-with-icon">
+                <i class="fas fa-lock"></i>
+                <input
+                  type="password"
+                  id="password"
+                  name="password"
+                  placeholder="Create a strong password"
+                  required
+                />
+                <button
+                  type="button"
+                  class="toggle-password"
+                  id="togglePassword"
+                >
+                  <i class="fas fa-eye"></i>
+                </button>
+              </div>
+              <div class="error-message" id="passwordError"></div>
+            </div>
+
+            <!-- Confirm Password -->
+            <div class="form-group">
+              <label for="confirmPassword">Confirm Password</label>
+              <div class="input-with-icon">
+                <i class="fas fa-lock"></i>
+                <input
+                  type="password"
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  placeholder="Confirm your password"
+                  required
+                />
+                <button
+                  type="button"
+                  class="toggle-password"
+                  id="toggleConfirmPassword"
+                >
+                  <i class="fas fa-eye"></i>
+                </button>
+              </div>
+              <div class="error-message" id="confirmPasswordError"></div>
+            </div>
+
+            <!-- Terms & Privacy -->
+            <div class="form-options">
+              <div class="remember-me">
+                <input type="checkbox" id="terms" name="terms" required />
+                <label for="terms"
+                  >I agree to the
+                  <a
+                    href="#"
+                    style="color: var(--primary); text-decoration: none"
+                    >Terms</a
+                  >
+                  and
+                  <a
+                    href="#"
+                    style="color: var(--primary); text-decoration: none"
+                    >Privacy Policy</a
+                  ></label
+                >
+              </div>
+            </div>
+
+            <!-- Sign Up Button -->
+            <button type="submit" class="btn-signup" id="signupBtn">
+              <span>Create Account</span>
+              <i class="fas fa-arrow-right"></i>
+            </button>
+          </form>
+
+          <!-- Already have account link -->
+          <div class="login-link">
+            <p>Already have an account? <a href="signin.html">Sign in</a></p>
+          </div>
+
+          <!-- Security Info -->
+          <div class="security-info">
+            <div class="secure-badge">
+              <i class="fas fa-shield-alt"></i>
+              <span>Your data is securely encrypted</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Benefits Panel -->
+        <div class="benefits-panel">
+          <div class="benefits-header">
+            <h2>Why Join Us?</h2>
+            <p>Discover the benefits of becoming a member</p>
+          </div>
+          <div class="benefits-list">
+            <div class="benefit-item">
+              <div class="benefit-icon">
+                <i class="fas fa-rocket"></i>
+              </div>
+              <div class="benefit-content">
+                <h3>Get Started in Minutes</h3>
+                <p>Quick setup process with instant access to all features.</p>
+              </div>
+            </div>
+            <div class="benefit-item">
+              <div class="benefit-icon">
+                <i class="fas fa-chart-line"></i>
+              </div>
+              <div class="benefit-content">
+                <h3>Personalized Experience</h3>
+                <p>
+                  Customize your dashboard and preferences to suit your needs.
+                </p>
+              </div>
+            </div>
+            <div class="benefit-item">
+              <div class="benefit-icon">
+                <i class="fas fa-cloud"></i>
+              </div>
+              <div class="benefit-content">
+                <h3>Cloud Storage Included</h3>
+                <p>10GB of secure cloud storage for your projects and files.</p>
+              </div>
+            </div>
+            <div class="benefit-item">
+              <div class="benefit-icon">
+                <i class="fas fa-users"></i>
+              </div>
+              <div class="benefit-content">
+                <h3>Join Our Community</h3>
+                <p>Connect with other users, share ideas, and collaborate.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="container">
+        <div class="footer-bottom">
+          <p>&copy; 2025 Price Pulse. All rights reserved.</p>
+          <div class="footer-extra">
+            <a href="privacy.html">Privacy Policy</a>
+            <a href="terms.html">Terms of Service</a>
+            <a href="support.html">Support</a>
+            <a href="contact.html">Contact</a>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <script src="signup.js"></script>
+  </body>
+</html>
