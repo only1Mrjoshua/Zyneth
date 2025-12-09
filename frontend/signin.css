@@ -373,9 +373,10 @@ body {
 
 .remember-me {
     display: flex;
-    align-items: center;
+    align-items: center; /* Make sure this exists */
     gap: 8px;
     flex-shrink: 0;
+    height: 24px; /* Add this - same as forgot-password */
 }
 
 .remember-me input[type="checkbox"] {
@@ -400,6 +401,10 @@ body {
     font-size: 0.9rem;
     transition: var(--transition);
     white-space: nowrap;
+    line-height: 1; /* Add this */
+    display: inline-flex; /* Add this */
+    align-items: center; /* Add this */
+    height: 24px; /* Add this - match the checkbox height */
 }
 
 .forgot-password:hover {
@@ -1068,6 +1073,7 @@ body {
     }
     
     .remember-me {
+        align-items: center;
         flex-shrink: 1;
     }
     
@@ -1191,6 +1197,7 @@ body {
     .remember-me {
         flex: 1;
         min-width: 0;
+        align-items: center;
     }
     
     .remember-me label {
