@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Profile - PricePulse | Smart Price Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="profile.css" />
+  </head>
+  <body>
+    <!-- Navigation Bar - Same as dashboard -->
+    <nav class="navbar">
+      <div class="nav-container">
+        <div class="logo-wrapper">
+          <div class="logo-img">
+            <img src="images/price pulse.png" alt="PricePulse Logo" />
+          </div>
+          <a href="index.html" class="logo-text">Price<span>Pulse</span></a>
+        </div>
+
+        <div class="nav-menu" id="navMenu">
+          <a href="dashboard.html" class="nav-link">Dashboard</a>
+          <a href="profile.html" class="nav-link active">Profile</a>
+          <a href="about.html" class="nav-link">About</a>
+          <div class="nav-buttons">
+            <a href="profile.html" class="btn-login">
+              <i class="fas fa-user"></i>
+              John Doe
+            </a>
+            <a href="index.html" class="btn-signup">Logout</a>
+          </div>
+        </div>
+
+        <button class="hamburger" id="hamburger">
+          <div class="bar"></div>
+          <div class="bar"></div>
+          <div class="bar"></div>
+        </button>
+      </div>
+    </nav>
+
+    <!-- Mobile Overlay -->
+    <div class="mobile-overlay" id="mobileOverlay"></div>
+
+    <!-- Main Profile Content -->
+    <main class="dashboard-container">
+      <!-- Profile Header -->
+      <header class="dashboard-header">
+        <div class="container">
+          <div class="header-content">
+            <h1 class="dashboard-title">
+              Your <span class="highlight">Profile</span>
+            </h1>
+            <p class="dashboard-subtitle">
+              Manage your account settings and personal information
+            </p>
+            <div class="header-actions">
+              <button class="btn-primary" id="editProfileBtn">
+                <i class="fas fa-edit"></i>
+                Edit Profile
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Profile Content -->
+      <section class="profile-section">
+        <div class="container">
+          <div class="profile-content">
+            <!-- Profile Summary Card -->
+            <div class="profile-card">
+              <div class="profile-header">
+                <div class="avatar-section">
+                  <div class="avatar">
+                    <i class="fas fa-user"></i>
+                  </div>
+                  <div class="avatar-info">
+                    <h2>John Doe</h2>
+                    <p class="user-role">Member</p>
+                    <div class="member-since">
+                      <i class="fas fa-calendar-star"></i>
+                      <span>Member since January 2023</span>
+                    </div>
+                  </div>
+                </div>
+                <button class="btn-secondary" id="editAvatarBtn">
+                  <i class="fas fa-camera"></i>
+                  Change Avatar
+                </button>
+              </div>
+
+              <div class="profile-stats">
+                <div class="profile-stat">
+                  <h3>12</h3>
+                  <p>Tracked Products</p>
+                </div>
+                <div class="profile-stat">
+                  <h3>8</h3>
+                  <p>Active Alerts</p>
+                </div>
+                <div class="profile-stat">
+                  <h3>₦45,200</h3>
+                  <p>Total Savings</p>
+                </div>
+                <div class="profile-stat">
+                  <h3>96</h3>
+                  <p>Price Drops Caught</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Profile Information & Form -->
+            <div class="profile-grid">
+              <!-- Current Information -->
+              <div class="info-card">
+                <div class="info-card-header">
+                  <h3>
+                    <i class="fas fa-info-circle"></i> Account Information
+                  </h3>
+                  <div class="account-status">
+                    <span class="status-badge active">Active</span>
+                  </div>
+                </div>
+                <div class="info-list">
+                  <div class="info-item">
+                    <div class="info-label">
+                      <i class="fas fa-envelope"></i>
+                      <span>Email Address</span>
+                    </div>
+                    <div class="info-value">
+                      <span>john.doe@example.com</span>
+                      <span class="verification-badge verified">
+                        <i class="fas fa-check-circle"></i>
+                        Verified
+                      </span>
+                    </div>
+                  </div>
+                  <div class="info-item">
+                    <div class="info-label">
+                      <i class="fas fa-phone"></i>
+                      <span>Phone Number</span>
+                    </div>
+                    <div class="info-value">
+                      <span>+234 812 345 6789</span>
+                    </div>
+                  </div>
+                  <div class="info-item">
+                    <div class="info-label">
+                      <i class="fas fa-map-marker-alt"></i>
+                      <span>Location</span>
+                    </div>
+                    <div class="info-value">
+                      <span>Lagos, Nigeria</span>
+                    </div>
+                  </div>
+                  <div class="info-item">
+                    <div class="info-label">
+                      <i class="fas fa-bell"></i>
+                      <span>Notification Settings</span>
+                    </div>
+                    <div class="info-value">
+                      <span>Email & Push Enabled</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Edit Form -->
+              <div class="form-card" id="editProfileForm" style="display: none">
+                <div class="form-card-header">
+                  <h3><i class="fas fa-edit"></i> Edit Profile</h3>
+                  <p class="form-subtitle">
+                    Update your personal information below
+                  </p>
+                </div>
+
+                <form id="profileForm" class="profile-form">
+                  <div class="form-group">
+                    <label for="fullName">
+                      <i class="fas fa-user"></i>
+                      Full Name
+                    </label>
+                    <input
+                      type="text"
+                      id="fullName"
+                      name="fullName"
+                      value="John Doe"
+                      placeholder="Enter your full name"
+                      required
+                    />
+                  </div>
+
+                  <div class="form-group">
+                    <label for="email">
+                      <i class="fas fa-envelope"></i>
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      id="email"
+                      name="email"
+                      value="john.doe@example.com"
+                      placeholder="Enter your email"
+                      required
+                    />
+                  </div>
+
+                  <div class="form-group">
+                    <label for="phone">
+                      <i class="fas fa-phone"></i>
+                      Phone Number
+                    </label>
+                    <input
+                      type="tel"
+                      id="phone"
+                      name="phone"
+                      value="+2348123456789"
+                      placeholder="Enter your phone number"
+                      required
+                    />
+                  </div>
+
+                  <div class="form-group">
+                    <label for="location">
+                      <i class="fas fa-map-marker-alt"></i>
+                      Location
+                    </label>
+                    <select id="location" name="location" required>
+                      <option value="lagos">Lagos, Nigeria</option>
+                      <option value="abuja">Abuja, Nigeria</option>
+                      <option value="ibadan">Ibadan, Nigeria</option>
+                      <option value="port-harcourt">
+                        Port Harcourt, Nigeria
+                      </option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+
+                  <div class="form-actions">
+                    <button type="button" class="btn-secondary" id="cancelBtn">
+                      Cancel
+                    </button>
+                    <button type="submit" class="btn-primary" id="saveBtn">
+                      <i class="fas fa-save"></i>
+                      Save Changes
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              <!-- Password Settings -->
+              <div class="form-card" id="passwordSettings">
+                <div class="form-card-header">
+                  <h3><i class="fas fa-lock"></i> Change Password</h3>
+                  <p class="form-subtitle">
+                    Update your password to keep your account secure
+                  </p>
+                </div>
+
+                <div class="info-list">
+                  <div class="info-item">
+                    <div class="info-label">
+                      <i class="fas fa-shield-alt"></i>
+                      <span>Password Security</span>
+                    </div>
+                    <div class="info-value">
+                      <span>Last changed: 3 months ago</span>
+                    </div>
+                  </div>
+                  <div class="info-actions">
+                    <button class="btn-primary" id="changePasswordBtn">
+                      <i class="fas fa-key"></i>
+                      Change Password
+                    </button>
+                  </div>
+                </div>
+
+                <form
+                  id="passwordForm"
+                  class="profile-form"
+                  style="display: none"
+                >
+                  <div class="form-group">
+                    <label for="currentPassword">
+                      <i class="fas fa-lock"></i>
+                      Current Password
+                    </label>
+                    <input
+                      type="password"
+                      id="currentPassword"
+                      name="currentPassword"
+                      placeholder="Enter current password"
+                    />
+                  </div>
+
+                  <div class="form-group">
+                    <label for="newPassword">
+                      <i class="fas fa-key"></i>
+                      New Password
+                    </label>
+                    <input
+                      type="password"
+                      id="newPassword"
+                      name="newPassword"
+                      placeholder="Enter new password"
+                    />
+                  </div>
+
+                  <div class="form-group">
+                    <label for="confirmPassword">
+                      <i class="fas fa-key"></i>
+                      Confirm New Password
+                    </label>
+                    <input
+                      type="password"
+                      id="confirmPassword"
+                      name="confirmPassword"
+                      placeholder="Confirm new password"
+                    />
+                  </div>
+
+                  <div class="form-actions">
+                    <button
+                      type="button"
+                      class="btn-secondary"
+                      id="cancelPasswordBtn"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      class="btn-primary"
+                      id="savePasswordBtn"
+                    >
+                      <i class="fas fa-save"></i>
+                      Update Password
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer - Same as dashboard -->
+    <footer class="footer">
+      <div class="container">
+        <div class="footer-content">
+          <div class="footer-brand">
+            <div class="logo-wrapper">
+              <div class="logo-img">
+                <img src="images/price pulse.png" alt="PricePulse Logo" />
+              </div>
+              <a href="index.html" class="logo-text">Price<span>Pulse</span></a>
+            </div>
+            <p class="footer-description">
+              Your intelligent shopping assistant that helps you track prices,
+              catch deals, and save money across all major e-commerce platforms.
+            </p>
+            <div class="social-links">
+              <a href="#"><i class="fab fa-twitter"></i></a>
+              <a href="#"><i class="fab fa-facebook-f"></i></a>
+              <a href="#"><i class="fab fa-instagram"></i></a>
+              <a href="#"><i class="fab fa-linkedin-in"></i></a>
+              <a href="#"><i class="fab fa-github"></i></a>
+            </div>
+          </div>
+
+          <div class="footer-links">
+            <div class="link-group">
+              <h4>Dashboard</h4>
+              <a href="dashboard.html">Overview</a>
+              <a href="products.html">My Products</a>
+              <a href="alerts.html">Price Alerts</a>
+              <a href="history.html">Price History</a>
+            </div>
+
+            <div class="link-group">
+              <h4>Account</h4>
+              <a href="profile.html">Profile</a>
+              <a href="settings.html">Settings</a>
+              <a href="help.html">Help Center</a>
+            </div>
+
+            <div class="link-group">
+              <h4>Platforms</h4>
+              <a href="#">Jumia Tracker</a>
+              <a href="#">Konga Tracker</a>
+              <a href="#">Amazon Tracker</a>
+              <a href="#">eBay Tracker</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer-bottom">
+          <p>
+            &copy; 2023 PricePulse. All rights reserved. Made with
+            <i class="fas fa-heart" style="color: #ffd700"></i> for smart
+            shoppers.
+          </p>
+          <div class="footer-extra">
+            <span>🇳🇬 Proudly serving African shoppers</span>
+            <div class="secure-badge">
+              <i class="fas fa-lock"></i>
+              <span>Secure & Private</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <script src="script.js"></script>
+    <script src="profile.js"></script>
+  </body>
+</html>
