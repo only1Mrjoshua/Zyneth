@@ -58,11 +58,14 @@ function loadAdminData() {
     // Load products
     loadProducts();
     
-    // Load alerts
-    loadAlerts();
+    // Don't load alerts - use HTML demo alerts
+    // loadAlerts(); // COMMENTED OUT TO USE HTML DEMO ALERTS
     
-    // Load activity log
-    loadActivityLog();
+    // Don't load activity log - use HTML demo activity log
+    // loadActivityLog(); // COMMENTED OUT TO USE HTML DEMO ACTIVITY LOG
+    
+    // Add event listeners to existing demo alerts and activity log
+    addEventListenersToAlerts();
 }
 
 function loadMetrics() {
@@ -405,201 +408,37 @@ function loadProducts() {
     });
 }
 
-function loadAlerts() {
-    const alertsList = document.getElementById('alertsList');
+// ========== ADD EVENT LISTENERS TO EXISTING DEMO ALERTS ==========
+function addEventListenersToAlerts() {
+    const alerts = document.querySelectorAll('.alert-item');
     
-    if (!alertsList) return;
-    
-    // Sample alerts data
-    const alerts = [
-        {
-            id: 1,
-            title: 'Price Drop Alert Triggered',
-            message: 'Samsung Galaxy S23 Ultra price dropped to ₦850,000 on Amazon',
-            platform: 'amazon',
-            time: '5 minutes ago',
-            status: 'sent',
-            users: 8,
-            unread: true
-        },
-        {
-            id: 2,
-            title: 'Target Price Reached',
-            message: 'Nike Air Max 270 React reached target price of ₦40,000',
-            platform: 'konga',
-            time: '1 hour ago',
-            status: 'sent',
-            users: 12,
-            unread: true
-        },
-        {
-            id: 3,
-            title: 'Price Scrape Failed',
-            message: 'Failed to scrape price for MacBook Pro from Jumia',
-            platform: 'jumia',
-            time: '2 hours ago',
-            status: 'failed',
-            users: 0,
-            unread: false
-        },
-        {
-            id: 4,
-            title: 'System Alert',
-            message: 'High system load detected on price scraping server',
-            platform: 'system',
-            time: '3 hours ago',
-            status: 'sent',
-            users: 0,
-            unread: false
-        }
-    ];
-    
-    // Clear existing alerts
-    alertsList.innerHTML = '';
-    
-    // Check if empty state should be shown
-    if (alerts.length === 0) {
-        const emptyState = document.getElementById('alertsEmptyState');
-        if (emptyState) {
-            emptyState.style.display = 'block';
-        }
-        return;
-    }
-    
-    const emptyState = document.getElementById('alertsEmptyState');
-    if (emptyState) {
-        emptyState.style.display = 'none';
-    }
-    
-    // Load alert template
-    const template = document.getElementById('alertItemTemplate');
-    if (!template) return;
-    
-    // Render each alert
-    alerts.forEach(alert => {
-        const clone = template.content.cloneNode(true);
-        const alertItem = clone.querySelector('.alert-item');
-        
-        if (alert.unread) {
-            alertItem.classList.add('unread');
-        }
-        
-        alertItem.setAttribute('data-alert-id', alert.id);
-        
-        // Alert title and time
-        const alertTitle = alertItem.querySelector('h4');
-        const alertTime = alertItem.querySelector('.alert-time');
-        
-        alertTitle.textContent = alert.title;
-        alertTime.textContent = alert.time;
-        
-        // Alert message
-        const alertMessage = alertItem.querySelector('.alert-message');
-        alertMessage.textContent = alert.message;
-        
-        // Platform badge
-        const platformBadge = alertItem.querySelector('.platform-badge');
-        const platformIcon = platformBadge.querySelector('i');
-        
-        const platformClasses = {
-            'amazon': 'fab fa-amazon',
-            'jumia': 'fas fa-shopping-cart',
-            'konga': 'fas fa-store',
-            'ebay': 'fab fa-ebay',
-            'system': 'fas fa-server'
-        };
-        
-        platformIcon.className = platformClasses[alert.platform] || 'fas fa-server';
-        platformBadge.querySelector('span').textContent = alert.platform.charAt(0).toUpperCase() + alert.platform.slice(1);
-        
-        // Status badge
-        const statusBadge = alertItem.querySelector('.status-badge');
-        const statusIcon = statusBadge.querySelector('i');
-        
-        statusBadge.className = `status-badge ${alert.status}`;
-        statusBadge.innerHTML = `<i class="fas fa-${alert.status === 'sent' ? 'check-circle' : 'exclamation-circle'}"></i> ${alert.status === 'sent' ? `Sent to ${alert.users} users` : 'Delivery Failed'}`;
+    alerts.forEach((alertItem, index) => {
+        const alertId = index + 1;
         
         // Add event listeners to action buttons
         const viewBtn = alertItem.querySelector('.view-details');
         const resolveBtn = alertItem.querySelector('.mark-resolved');
         
-        viewBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            viewAlertDetails(alert.id);
-        });
+        if (viewBtn) {
+            viewBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                viewAlertDetails(alertId);
+            });
+        }
         
-        resolveBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            markAlertResolved(alert.id);
-        });
+        if (resolveBtn) {
+            resolveBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                markAlertResolved(alertId);
+            });
+        }
         
         // Add click event to view alert
         alertItem.addEventListener('click', (e) => {
             if (!e.target.closest('.alert-actions')) {
-                viewAlertDetails(alert.id);
+                viewAlertDetails(alertId);
             }
         });
-        
-        // Add to list
-        alertsList.appendChild(clone);
-    });
-}
-
-function loadActivityLog() {
-    const activityLog = document.getElementById('activityLog');
-    if (!activityLog) return;
-    
-    // Sample activity data
-    const activities = [
-        {
-            id: 1,
-            message: 'Admin suspended user john_doe',
-            time: '10:25 AM'
-        },
-        {
-            id: 2,
-            message: 'Price scrape failed for Jumia – Product ID 302',
-            time: '09:45 AM'
-        },
-        {
-            id: 3,
-            message: 'System backup completed successfully',
-            time: '08:30 AM'
-        },
-        {
-            id: 4,
-            message: 'Admin added new user alice_johnson',
-            time: 'Yesterday, 4:15 PM'
-        },
-        {
-            id: 5,
-            message: 'Amazon API rate limit reached, retrying in 5 minutes',
-            time: 'Yesterday, 2:45 PM'
-        }
-    ];
-    
-    // Clear existing activities
-    activityLog.innerHTML = '';
-    
-    // Load activity template
-    const template = document.getElementById('activityEntryTemplate');
-    if (!template) return;
-    
-    // Render each activity
-    activities.forEach(activity => {
-        const clone = template.content.cloneNode(true);
-        const activityEntry = clone.querySelector('.activity-entry');
-        
-        // Activity message
-        const message = activityEntry.querySelector('.activity-message');
-        message.innerHTML = activity.message.replace('Admin', '<strong>Admin</strong>');
-        
-        // Activity time
-        const time = activityEntry.querySelector('.activity-time');
-        time.textContent = activity.time;
-        
-        // Add to log
-        activityLog.appendChild(clone);
     });
 }
 
@@ -658,8 +497,10 @@ function refreshSystemData() {
     
     // Simulate API call
     setTimeout(() => {
-        // Reload all data
-        loadAdminData();
+        // Reload all data (except alerts and activity log)
+        loadMetrics();
+        loadUsers();
+        loadProducts();
         
         // Update time
         updateTimeDisplays();
@@ -835,7 +676,7 @@ function viewAlertDetails(alertId) {
     // In a real app, this would open a modal
     setTimeout(() => {
         // Mark as read
-        const alertItem = document.querySelector(`.alert-item[data-alert-id="${alertId}"]`);
+        const alertItem = document.querySelector(`.alert-item:nth-child(${alertId})`);
         if (alertItem) {
             alertItem.classList.remove('unread');
         }
@@ -848,7 +689,7 @@ function markAlertResolved(alertId) {
     console.log(`Marking alert ${alertId} as resolved`);
     
     // Remove from UI
-    const alertItem = document.querySelector(`.alert-item[data-alert-id="${alertId}"]`);
+    const alertItem = document.querySelector(`.alert-item:nth-child(${alertId})`);
     if (alertItem) {
         alertItem.style.opacity = '0';
         alertItem.style.transform = 'translateX(-20px)';
