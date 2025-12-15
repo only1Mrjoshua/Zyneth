@@ -153,7 +153,7 @@ async def login(
     print(f"✅ User found: {user.username} ({user.email})")
     
     # Verify password
-    if not verify_password(form_data.password, user.hashed_password):
+    if not verify_password(form_data.password, user.password_hash):
         print(f"❌ Invalid password for user: {user.email}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
