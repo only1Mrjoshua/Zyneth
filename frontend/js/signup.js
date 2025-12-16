@@ -699,10 +699,9 @@ class SignupHandler {
             icon.classList.add('fa-eye');
         });
         
-        // Redirect to dashboard after 2 seconds
         setTimeout(() => {
             window.location.href = '/dashboard.html';
-        }, 2000);
+        }, 500);
     }
 
     handleError(errorMessage) {
