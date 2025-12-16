@@ -701,7 +701,7 @@ class SignupHandler {
         
         // Redirect to dashboard after 2 seconds
         setTimeout(() => {
-            window.location.href = '/frontend/html/dashboard.html';
+            window.location.href = '/dashboard.html';
         }, 2000);
     }
 
