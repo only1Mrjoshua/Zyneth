@@ -984,3 +984,299 @@ window.addEventListener('resize', () => {
         }
     }
 });
+
+// ========== LOGOUT FUNCTIONALITY ==========
+function initLogoutFeature() {
+    // Target your logout button by ID
+    const logoutBtn = document.getElementById('logoutBtn');
+    
+    if (logoutBtn) {
+        // Add click event for logout confirmation
+        logoutBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            showLogoutModal();
+        });
+    }
+}
+
+// Show logout confirmation modal
+function showLogoutModal() {
+    const modal = document.getElementById('logoutModal');
+    if (!modal) return;
+    
+    // Show modal
+    modal.classList.add('active');
+    
+    // Add event listeners for modal buttons
+    const confirmBtn = document.getElementById('confirmLogout');
+    const cancelBtn = document.getElementById('cancelLogout');
+    const closeBtn = document.getElementById('closeLogoutModal');
+    
+    if (confirmBtn) {
+        confirmBtn.onclick = handleLogout;
+    }
+    
+    if (cancelBtn) {
+        cancelBtn.onclick = hideLogoutModal;
+    }
+    
+    if (closeBtn) {
+        closeBtn.onclick = hideLogoutModal;
+    }
+    
+    // Close modal on overlay click
+    modal.onclick = (e) => {
+        if (e.target === modal) {
+            hideLogoutModal();
+        }
+    };
+    
+    // Prevent modal content clicks from closing modal
+    const modalContent = modal.querySelector('.modal-content');
+    if (modalContent) {
+        modalContent.onclick = (e) => {
+            e.stopPropagation();
+        };
+    }
+}
+
+// Hide logout confirmation modal
+function hideLogoutModal() {
+    const modal = document.getElementById('logoutModal');
+    if (!modal) return;
+    
+    modal.classList.remove('active');
+    showToast('Logout cancelled', 'info');
+}
+
+// Clear all authentication tokens and session data
+function clearAuthTokens() {
+    // Clear localStorage tokens
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('user');
+    localStorage.removeItem('isLoggedIn');
+    localStorage.removeItem('loginTime');
+    localStorage.removeItem('sessionExpiry');
+    localStorage.removeItem('token');
+    localStorage.removeItem('access_token');
+    
+    // Clear sessionStorage tokens
+    sessionStorage.clear();
+    
+    // Clear cookies (if using cookies)
+    document.cookie.split(";").forEach(function(c) {
+        document.cookie = c.replace(/^ +/, "")
+            .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+    });
+    
+    // Clear any application-specific state
+    if (window.auth) {
+        window.auth.token = null;
+        window.auth.user = null;
+        window.auth.isAuthenticated = false;
+    }
+    
+    // Clear all cookies more aggressively
+    const cookies = document.cookie.split(";");
+    for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i];
+        const eqPos = cookie.indexOf("=");
+        const name = eqPos > -1 ? cookie.substr(0, eqPos) : cookie;
+        document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+        document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=" + window.location.hostname;
+    }
+}
+
+// Handle actual logout
+function handleLogout() {
+    const modal = document.getElementById('logoutModal');
+    if (modal) {
+        modal.classList.remove('active');
+    }
+    
+    // Show logout in progress toast
+    showToast('Logging out...', 'info');
+    
+    // Clear authentication tokens/session data FIRST
+    clearAuthTokens();
+    
+    // Simulate logout process
+    setTimeout(() => {
+        // Show success toast
+        showToast('Successfully logged out', 'success');
+        
+        // Redirect to signin page after a short delay
+        setTimeout(() => {
+            window.location.href = 'signin.html';
+        }, 1500);
+    }, 1000);
+}
+
+// ========== TOAST NOTIFICATION SYSTEM ==========
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+    
+    // Create toast element
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    
+    // Set icon based on type
+    const icons = {
+        'success': 'check-circle',
+        'info': 'info-circle',
+        'error': 'exclamation-circle'
+    };
+    
+    const toastId = 'toast-' + Date.now();
+    toast.id = toastId;
+    
+    toast.innerHTML = `
+        <div class="toast-icon">
+            <i class="fas fa-${icons[type] || 'info-circle'}"></i>
+        </div>
+        <div class="toast-content">
+            <h4 class="toast-title">${type.charAt(0).toUpperCase() + type.slice(1)}</h4>
+            <p class="toast-message">${message}</p>
+        </div>
+        <button class="toast-close" onclick="removeToast('${toastId}')">
+            <i class="fas fa-times"></i>
+        </button>
+        <div class="toast-progress">
+            <div class="toast-progress-bar"></div>
+        </div>
+    `;
+    
+    // Add to container
+    container.appendChild(toast);
+    
+    // Show toast with animation
+    setTimeout(() => {
+        toast.classList.add('show');
+        
+        // Start progress bar animation
+        const progressBar = toast.querySelector('.toast-progress-bar');
+        if (progressBar) {
+            progressBar.style.transition = 'transform 5s linear';
+            progressBar.style.transform = 'scaleX(0)';
+        }
+    }, 10);
+    
+    // Auto-remove toast after 5 seconds
+    setTimeout(() => {
+        removeToast(toastId);
+    }, 5000);
+}
+
+// Remove toast function (exposed globally for button click)
+function removeToast(toastId) {
+    const toast = document.getElementById(toastId);
+    if (!toast) return;
+    
+    toast.classList.remove('show');
+    
+    // Remove from DOM after animation
+    setTimeout(() => {
+        if (toast.parentNode) {
+            toast.parentNode.removeChild(toast);
+        }
+    }, 500);
+}
+
+// ========== SESSION MANAGEMENT ==========
+// Check if token exists and is valid (use this on protected pages)
+function checkAuthStatus() {
+    const token = localStorage.getItem('authToken') || 
+                  localStorage.getItem('token') ||
+                  sessionStorage.getItem('authToken');
+    
+    if (!token) {
+        // No token found, redirect to login
+        window.location.href = 'signin.html';
+        return false;
+    }
+    
+    // Optional: Validate token expiration if JWT
+    if (!isValidToken(token)) {
+        clearAuthTokens();
+        window.location.href = 'signin.html';
+        return false;
+    }
+    
+    return true;
+}
+
+// Simple token validation
+function isValidToken(token) {
+    if (!token || token.length < 10) return false;
+    
+    try {
+        // If it's a JWT token (has 3 parts separated by dots)
+        if (token.split('.').length === 3) {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            // Check if token is expired
+            if (payload.exp && payload.exp < Date.now() / 1000) {
+                return false;
+            }
+        }
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+// Check existing session (use this on signin page)
+function checkExistingSession() {
+    const token = localStorage.getItem('authToken') || 
+                  localStorage.getItem('token') ||
+                  sessionStorage.getItem('authToken');
+    
+    // If valid token exists and user is on signin page, redirect to dashboard
+    if (token && isValidToken(token) && window.location.pathname.includes('signin.html')) {
+        window.location.href = 'dashboard.html';
+    }
+}
+
+// Check session expiry on protected pages
+function checkSessionExpiry() {
+    const expiryTime = localStorage.getItem('sessionExpiry');
+    const currentTime = Date.now();
+    
+    if (expiryTime && currentTime > parseInt(expiryTime)) {
+        // Session expired
+        clearAuthTokens();
+        showToast('Session expired. Please login again.', 'error');
+        setTimeout(() => {
+            window.location.href = 'signin.html';
+        }, 2000);
+        return false;
+    }
+    return true;
+}
+
+// ========== INITIALIZE ALL FUNCTIONALITY ==========
+document.addEventListener('DOMContentLoaded', () => {
+    // Check if we're on signin page
+    if (window.location.pathname.includes('signin.html')) {
+        checkExistingSession();
+    } else {
+        // For protected pages, check authentication
+        if (!checkAuthStatus()) {
+            return; // Stop initialization if not authenticated
+        }
+        
+        // Check session expiry
+        if (!checkSessionExpiry()) {
+            return;
+        }
+    }
+    
+    // Initialize logout feature
+    initLogoutFeature();
+    
+    // Then initialize admin dashboard (your existing code)
+    if (typeof initAdminDashboard === 'function') {
+        initAdminDashboard();
+    }
+});
