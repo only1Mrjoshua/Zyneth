@@ -19,6 +19,36 @@
     />
     <link rel="stylesheet" href="css/style.css" />
     <link rel="stylesheet" href="css/settings.css" />
+    <script>
+      const token = localStorage.getItem("token");
+
+      // If no token, go to signin
+      if (!token) {
+        window.location.href = "signin.html";
+      } else {
+        function parseJwt(token) {
+          try {
+            return JSON.parse(atob(token.split(".")[1]));
+          } catch (e) {
+            return null;
+          }
+        }
+
+        const payload = parseJwt(token);
+
+        // If token is invalid, force signin
+        if (!payload || !payload.role) {
+          window.location.href = "signin.html";
+        }
+
+        // Redirect admin to admin dashboard
+        if (payload.role === "admin") {
+          window.location.href = "admin-dashboard.html";
+        }
+
+        // If role is user → do nothing, page loads normally
+      }
+    </script>
   </head>
   <body>
     <!-- Navigation Bar - Same as dashboard -->
