@@ -20,7 +20,7 @@ app.add_middleware(
         "http://127.0.0.1:5500",
         "https://zyneth.shop",           
         "https://www.zyneth.shop",       
-        "https://price-pulse-backend-ttv4.onrender.com", 
+        "https://https://zyneth-backend.onrender.com", 
         "http://localhost:8000", 
     ],
     allow_credentials=True,
