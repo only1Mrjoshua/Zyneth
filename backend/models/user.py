@@ -25,6 +25,13 @@ class User(BaseModel):
     last_login: Optional[datetime] = None
     is_active: bool = True
 
+    # OTP fields
+    otp_code: Optional[str] = None
+    otp_created_at: Optional[datetime] = None
+    is_verified: bool = False
+    otp_attempts: int = 0
+    otp_locked_until: Optional[datetime] = None
+
     class Config:
         from_attributes = True
         use_enum_values = True

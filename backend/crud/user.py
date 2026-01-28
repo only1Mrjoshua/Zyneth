@@ -1,7 +1,8 @@
 from typing import List, Optional
 from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorDatabase
-from datetime import datetime
+from datetime import datetime, timedelta
+import random
 
 from models.user import User, RoleEnum
 from schemas.user import UserCreate, AdminUserCreate
@@ -101,7 +102,7 @@ class UserCRUD:
             user_count = await self.db.users.count_documents({})
             role = RoleEnum.admin if user_count == 0 else user_data.role
 
-            # Prepare user document
+            # Prepare user document with OTP fields
             user_dict = {
                 "full_name": user_data.full_name,
                 "username": user_data.username,
@@ -111,7 +112,13 @@ class UserCRUD:
                 "avatar_url": avatar_url,
                 "created_at": datetime.utcnow(),
                 "last_login": None,
-                "is_active": True
+                "is_active": True,
+                # OTP fields
+                "otp_code": None,
+                "otp_created_at": None,
+                "is_verified": False,
+                "otp_attempts": 0,
+                "otp_locked_until": None
             }
 
             # Add is_active for AdminUserCreate
@@ -303,3 +310,186 @@ class UserCRUD:
         except Exception as e:
             print(f"❌ Error searching users: {e}")
             return []
+
+    # ========== OTP METHODS ==========
+
+    async def generate_and_store_otp(self, email: str) -> Optional[str]:
+        """
+        Generate a 6-digit OTP and store it for the user.
+        Returns the OTP code if successful, None otherwise.
+        """
+        if not await self._is_connected():
+            return None
+            
+        try:
+            # Check if user exists
+            user = await self.get_user_by_email(email)
+            if not user:
+                return None
+            
+            # Check if user is OTP locked
+            if user.otp_locked_until and user.otp_locked_until > datetime.utcnow():
+                return None
+            
+            # Generate 6-digit OTP
+            otp_code = str(random.randint(100000, 999999))
+            
+            # Store OTP with timestamp (valid for 10 minutes)
+            update_data = {
+                "otp_code": otp_code,
+                "otp_created_at": datetime.utcnow(),
+                "otp_attempts": 0,  # Reset attempts
+                "otp_locked_until": None,
+                "is_verified": False,  # Reset verification status
+                "updated_at": datetime.utcnow()
+            }
+            
+            result = await self.db.users.update_one(
+                {"email": email},
+                {"$set": update_data}
+            )
+            
+            if result.modified_count > 0:
+                return otp_code
+            return None
+            
+        except Exception as e:
+            print(f"❌ Error generating OTP: {e}")
+            return None
+
+    async def verify_otp(self, email: str, otp_code: str) -> dict:
+        """
+        Verify OTP for a user.
+        Returns a dictionary with verification result and status.
+        """
+        if not await self._is_connected():
+            return {"success": False, "message": "Database error"}
+            
+        try:
+            # Get user
+            user = await self.get_user_by_email(email)
+            if not user:
+                return {"success": False, "message": "User not found"}
+            
+            # Check if user is OTP locked
+            if user.otp_locked_until and user.otp_locked_until > datetime.utcnow():
+                time_left = int((user.otp_locked_until - datetime.utcnow()).total_seconds())
+                return {
+                    "success": False, 
+                    "message": "Too many attempts. Try again later.",
+                    "locked": True,
+                    "retry_after": time_left
+                }
+            
+            # Check if OTP exists and is not expired (10 minutes)
+            if not user.otp_code or not user.otp_created_at:
+                await self._increment_otp_attempts(email)
+                return {"success": False, "message": "Invalid or expired OTP"}
+            
+            otp_age = datetime.utcnow() - user.otp_created_at
+            if otp_age > timedelta(minutes=10):
+                await self._increment_otp_attempts(email)
+                return {"success": False, "message": "OTP has expired"}
+            
+            # Verify OTP code
+            if user.otp_code != otp_code:
+                await self._increment_otp_attempts(email)
+                remaining_attempts = 3 - (user.otp_attempts + 1)
+                return {
+                    "success": False, 
+                    "message": f"Invalid OTP. {remaining_attempts} attempts remaining.",
+                    "remaining_attempts": remaining_attempts
+                }
+            
+            # OTP is valid - mark user as verified and clear OTP data
+            update_data = {
+                "is_verified": True,
+                "otp_code": None,
+                "otp_created_at": None,
+                "otp_attempts": 0,
+                "otp_locked_until": None,
+                "updated_at": datetime.utcnow()
+            }
+            
+            result = await self.db.users.update_one(
+                {"email": email},
+                {"$set": update_data}
+            )
+            
+            if result.modified_count > 0:
+                return {"success": True, "message": "Email verified successfully"}
+            return {"success": False, "message": "Verification failed"}
+            
+        except Exception as e:
+            print(f"❌ Error verifying OTP: {e}")
+            return {"success": False, "message": "Server error"}
+
+    async def _increment_otp_attempts(self, email: str):
+        """Increment OTP attempts and lock if too many failures."""
+        try:
+            user = await self.get_user_by_email(email)
+            if not user:
+                return
+            
+            new_attempts = user.otp_attempts + 1
+            update_data = {"otp_attempts": new_attempts}
+            
+            # Lock user for 15 minutes after 3 failed attempts
+            if new_attempts >= 3:
+                update_data["otp_locked_until"] = datetime.utcnow() + timedelta(minutes=15)
+            
+            await self.db.users.update_one(
+                {"email": email},
+                {"$set": update_data}
+            )
+            
+        except Exception as e:
+            print(f"❌ Error incrementing OTP attempts: {e}")
+
+    async def clear_otp_data(self, email: str) -> bool:
+        """Clear OTP data for a user."""
+        if not await self._is_connected():
+            return False
+            
+        try:
+            result = await self.db.users.update_one(
+                {"email": email},
+                {"$set": {
+                    "otp_code": None,
+                    "otp_created_at": None,
+                    "otp_attempts": 0,
+                    "otp_locked_until": None,
+                    "updated_at": datetime.utcnow()
+                }}
+            )
+            return result.modified_count > 0
+        except Exception as e:
+            print(f"❌ Error clearing OTP data: {e}")
+            return False
+
+    async def resend_otp(self, email: str) -> Optional[str]:
+        """
+        Resend OTP to a user.
+        Returns new OTP code if successful, None otherwise.
+        """
+        # Clear existing OTP data first
+        await self.clear_otp_data(email)
+        
+        # Generate new OTP
+        return await self.generate_and_store_otp(email)
+
+    async def check_otp_status(self, email: str) -> dict:
+        """Check OTP status for a user."""
+        user = await self.get_user_by_email(email)
+        if not user:
+            return {"exists": False}
+        
+        return {
+            "exists": True,
+            "is_verified": user.is_verified,
+            "has_otp": user.otp_code is not None,
+            "otp_created_at": user.otp_created_at,
+            "otp_attempts": user.otp_attempts,
+            "otp_locked_until": user.otp_locked_until,
+            "is_locked": user.otp_locked_until and user.otp_locked_until > datetime.utcnow()
+        }

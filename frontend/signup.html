@@ -39,7 +39,7 @@
     <main class="signup-container">
       <div class="signup-section">
         <!-- Sign Up Form -->
-        <div class="signup-wrapper">
+        <div class="signup-wrapper" id="signupWrapper">
           <div class="signup-header">
             <h1>Create Your Account</h1>
             <p class="signup-subtitle">
@@ -192,6 +192,114 @@
             <div class="secure-badge">
               <i class="fas fa-shield-alt"></i>
               <span>Your data is securely encrypted</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- OTP Verification Section (Hidden Initially) -->
+        <div class="otp-wrapper" id="otpWrapper" style="display: none">
+          <div class="signup-header">
+            <div class="back-button" id="backToSignup">
+              <i class="fas fa-arrow-left"></i>
+              <span>Back</span>
+            </div>
+            <h1>Verify Your Email</h1>
+            <p class="signup-subtitle" id="otpSubtitle">
+              We've sent a 6-digit code to
+              <span
+                id="userEmail"
+                style="color: var(--primary); font-weight: 600"
+              ></span>
+            </p>
+          </div>
+
+          <!-- OTP Form -->
+          <form class="otp-form" id="otpForm">
+            <!-- OTP Input -->
+            <div class="form-group">
+              <label for="otp">Verification Code</label>
+              <div class="otp-container">
+                <div class="otp-inputs">
+                  <input
+                    type="text"
+                    maxlength="1"
+                    class="otp-input"
+                    data-index="0"
+                    autofocus
+                  />
+                  <input
+                    type="text"
+                    maxlength="1"
+                    class="otp-input"
+                    data-index="1"
+                  />
+                  <input
+                    type="text"
+                    maxlength="1"
+                    class="otp-input"
+                    data-index="2"
+                  />
+                  <input
+                    type="text"
+                    maxlength="1"
+                    class="otp-input"
+                    data-index="3"
+                  />
+                  <input
+                    type="text"
+                    maxlength="1"
+                    class="otp-input"
+                    data-index="4"
+                  />
+                  <input
+                    type="text"
+                    maxlength="1"
+                    class="otp-input"
+                    data-index="5"
+                  />
+                </div>
+                <div class="error-message" id="otpError"></div>
+              </div>
+            </div>
+
+            <!-- Timer and Resend -->
+            <div class="otp-actions">
+              <div class="timer-container" id="timerContainer">
+                <i class="far fa-clock"></i>
+                <span id="countdown">02:00</span>
+              </div>
+              <button
+                type="button"
+                class="resend-link"
+                id="resendOtpBtn"
+                disabled
+              >
+                Resend Code
+              </button>
+            </div>
+
+            <!-- Verify Button -->
+            <button type="submit" class="btn-signup" id="verifyOtpBtn">
+              <span>Verify Email</span>
+              <i class="fas fa-check-circle"></i>
+            </button>
+          </form>
+
+          <!-- Didn't receive code? -->
+          <div class="otp-help">
+            <p>Didn't receive the code?</p>
+            <ul>
+              <li>Check your spam or junk folder</li>
+              <li>Make sure you entered the correct email address</li>
+              <li>Wait a few minutes and try again</li>
+            </ul>
+          </div>
+
+          <!-- Security Info -->
+          <div class="security-info">
+            <div class="secure-badge">
+              <i class="fas fa-shield-alt"></i>
+              <span>This code will expire in 2 minutes</span>
             </div>
           </div>
         </div>

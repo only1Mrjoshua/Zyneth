@@ -1555,6 +1555,273 @@ img, video, canvas {
     margin-top: 5px;
 }
 
+/* ==============================
+   OTP VERIFICATION STYLES
+   ============================== */
+
+/* OTP Container */
+.otp-wrapper {
+  background-color: rgba(15, 23, 42, 0.8);
+  border-radius: 20px;
+  padding: 40px;
+  box-shadow: var(--shadow-lg);
+  border: 1px solid rgba(255, 215, 0, 0.1);
+  animation: fadeInUp 0.8s ease-out;
+  width: 100%;
+}
+
+/* Back Button */
+.back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--primary);
+  background: none;
+  border: none;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 500;
+  font-size: 0.95rem;
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: 8px;
+  transition: var(--transition);
+  margin-bottom: 20px;
+}
+
+.back-button:hover {
+  background: rgba(255, 215, 0, 0.1);
+  transform: translateX(-4px);
+}
+
+.back-button i {
+  font-size: 0.9rem;
+}
+
+/* OTP Inputs Container */
+.otp-container {
+  width: 100%;
+}
+
+.otp-inputs {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.otp-input {
+  width: 60px;
+  height: 70px;
+  text-align: center;
+  font-size: 2rem;
+  font-weight: 600;
+  font-family: 'Poppins', sans-serif;
+  color: var(--light);
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  transition: var(--transition);
+  outline: none;
+}
+
+.otp-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.otp-input.filled {
+  border-color: var(--primary);
+  background-color: rgba(255, 215, 0, 0.05);
+}
+
+/* OTP Actions */
+.otp-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 20px 0 30px;
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.timer-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--light-gray);
+  font-size: 0.95rem;
+}
+
+.timer-container i {
+  color: var(--primary);
+  font-size: 1.1rem;
+}
+
+#countdown {
+  font-family: 'Inter', monospace;
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: var(--light);
+}
+
+.resend-link {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-family: 'Poppins', sans-serif;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: 8px;
+  transition: var(--transition);
+}
+
+.resend-link:not(:disabled):hover {
+  background: rgba(255, 215, 0, 0.1);
+  text-decoration: underline;
+}
+
+.resend-link:disabled {
+  color: var(--gray);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* OTP Help */
+.otp-help {
+  margin-top: 30px;
+  padding: 20px;
+  background: rgba(255, 215, 0, 0.05);
+  border-radius: 12px;
+  border-left: 4px solid var(--primary);
+}
+
+.otp-help p {
+  color: var(--light);
+  font-weight: 600;
+  margin-bottom: 12px;
+  font-size: 0.95rem;
+}
+
+.otp-help ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+.otp-help li {
+  color: var(--light-gray);
+  font-size: 0.9rem;
+  margin-bottom: 8px;
+  padding-left: 20px;
+  position: relative;
+  font-family: 'Inter', sans-serif;
+}
+
+.otp-help li:before {
+  content: '•';
+  color: var(--primary);
+  position: absolute;
+  left: 0;
+}
+
+/* OTP Form */
+.otp-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+}
+
+/* Loading State for Verify Button */
+#verifyOtpBtn.loading {
+  position: relative;
+  color: transparent;
+}
+
+#verifyOtpBtn.loading::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(10, 31, 68, 0.3);
+  border-top-color: var(--secondary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* OTP Success Animation */
+@keyframes otpSuccess {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+.otp-success {
+  animation: otpSuccess 0.5s ease;
+}
+
+/* Responsive adjustments for OTP */
+@media (max-width: 768px) {
+  .otp-inputs {
+    gap: 8px;
+  }
+  
+  .otp-input {
+    width: 50px;
+    height: 60px;
+    font-size: 1.8rem;
+  }
+  
+  .otp-actions {
+    flex-direction: column;
+    gap: 15px;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .otp-inputs {
+    gap: 6px;
+  }
+  
+  .otp-input {
+    width: 45px;
+    height: 55px;
+    font-size: 1.6rem;
+  }
+  
+  .otp-help {
+    padding: 15px;
+  }
+  
+  .otp-help li {
+    font-size: 0.85rem;
+  }
+}
+
+/* Slide transition for OTP */
+@keyframes slideOutLeft {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(-50px); opacity: 0; }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(50px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.slide-out {
+  animation: slideOutLeft 0.3s ease-out forwards;
+}
+
+.slide-in {
+  animation: slideInRight 0.3s ease-out forwards;
+}
+
 /* Password Strength Indicator */
 .password-strength-container {
     margin-top: 5px;

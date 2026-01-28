@@ -1,15 +1,20 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Form, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, status, Form, File, UploadFile, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
 from typing import List, Optional
 from datetime import datetime
 import os, uuid
 from bson import ObjectId
+import resend
+from dotenv import load_dotenv
 
 from database import get_database
 from models.user import RoleEnum
 from schemas.user import UserCreate, AdminUserCreate, UserOut, UserLogin
 from utils.security import hash_password, verify_password, create_access_token
 from dependencies import get_current_user, require_admin
+
+# Load environment variables
+load_dotenv()
 
 # Create directory if not exists
 UPLOAD_DIR = "static/avatars"
@@ -21,7 +26,341 @@ async def get_user_crud(db=Depends(get_database)):
     from crud.user import UserCRUD
     return UserCRUD(db)
 
-# FIXED: Updated signup function for new two-role system
+# ========== REAL EMAIL SERVICE WITH RESEND ==========
+class EmailService:
+    """Email service using Resend with fallback for development"""
+    
+    @staticmethod
+    async def send_otp_email(email: str, otp_code: str) -> bool:
+        """
+        Send OTP email using Resend with no-reply@zyneth.shop as sender.
+        Falls back to console logging if Resend fails.
+        """
+        # Try to send with Resend first
+        resend_api_key = os.getenv("RESEND_API_KEY")
+        
+        if resend_api_key:
+            try:
+                resend.api_key = resend_api_key
+                
+                params = {
+                    "from": "Zyneth <no-reply@zyneth.shop>",  # Using your email domain
+                    "to": [email],
+                    "subject": "Verify Your Email - Zyneth",
+                    "html": f"""
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <meta charset="UTF-8">
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                        <title>Verify Your Email</title>
+                        <style>
+                            body {{
+                                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                                line-height: 1.6;
+                                color: #333;
+                                margin: 0;
+                                padding: 0;
+                                background-color: #f4f4f4;
+                            }}
+                            .container {{
+                                max-width: 600px;
+                                margin: 0 auto;
+                                background-color: #ffffff;
+                                border-radius: 10px;
+                                overflow: hidden;
+                                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+                            }}
+                            .header {{
+                                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                color: white;
+                                padding: 40px 30px;
+                                text-align: center;
+                            }}
+                            .logo {{
+                                font-size: 28px;
+                                font-weight: 700;
+                                margin-bottom: 10px;
+                            }}
+                            .content {{
+                                padding: 40px 30px;
+                            }}
+                            .otp-box {{
+                                background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+                                color: white;
+                                font-size: 36px;
+                                font-weight: 700;
+                                letter-spacing: 8px;
+                                text-align: center;
+                                padding: 20px;
+                                border-radius: 8px;
+                                margin: 30px 0;
+                                font-family: monospace;
+                            }}
+                            .instructions {{
+                                background-color: #f8f9fa;
+                                border-left: 4px solid #667eea;
+                                padding: 15px 20px;
+                                margin: 25px 0;
+                                border-radius: 4px;
+                            }}
+                            .footer {{
+                                text-align: center;
+                                padding: 20px;
+                                color: #666;
+                                font-size: 12px;
+                                border-top: 1px solid #eee;
+                                background-color: #f9f9f9;
+                            }}
+                            .button {{
+                                display: inline-block;
+                                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                color: white;
+                                padding: 12px 30px;
+                                text-decoration: none;
+                                border-radius: 5px;
+                                font-weight: 600;
+                                margin-top: 20px;
+                            }}
+                            @media (max-width: 600px) {{
+                                .container {{
+                                    margin: 10px;
+                                }}
+                                .header {{
+                                    padding: 30px 20px;
+                                }}
+                                .content {{
+                                    padding: 30px 20px;
+                                }}
+                                .otp-box {{
+                                    font-size: 28px;
+                                    letter-spacing: 6px;
+                                    padding: 15px;
+                                }}
+                            }}
+                        </style>
+                    </head>
+                    <body>
+                        <div class="container">
+                            <div class="header">
+                                <div class="logo">Zyneth</div>
+                                <p style="margin: 0; opacity: 0.9;">Email Verification</p>
+                            </div>
+                            
+                            <div class="content">
+                                <h2 style="color: #333; margin-top: 0;">Hello!</h2>
+                                <p>Thank you for signing up with Zyneth. To complete your registration, please use the verification code below:</p>
+                                
+                                <div class="otp-box">{otp_code}</div>
+                                
+                                <div class="instructions">
+                                    <p><strong>📋 Instructions:</strong></p>
+                                    <ol style="margin: 10px 0; padding-left: 20px;">
+                                        <li>Enter the 6-digit code above in the verification form</li>
+                                        <li>The code is valid for <strong>10 minutes</strong></li>
+                                        <li>If you didn't request this code, please ignore this email</li>
+                                    </ol>
+                                </div>
+                                
+                                <p>If you have any issues, please contact our support team.</p>
+                                
+                                <p style="margin-top: 30px;">
+                                    Best regards,<br>
+                                    <strong>The Zyneth Team</strong>
+                                </p>
+                            </div>
+                            
+                            <div class="footer">
+                                <p>&copy; 2025 Zyneth. All rights reserved.</p>
+                                <p>This is an automated message, please do not reply to this email.</p>
+                            </div>
+                        </div>
+                    </body>
+                    </html>
+                    """
+                }
+                
+                # Send email via Resend
+                response = resend.Emails.send(params)
+                print(f"✅ Email sent to {email} via Resend. Message ID: {response['id']}")
+                return True
+                
+            except Exception as e:
+                print(f"❌ Resend failed for {email}: {e}")
+                # Fall through to console logging
+        
+        # Fallback to console logging for development
+        print("\n" + "="*60)
+        print(f"📧 OTP VERIFICATION CODE")
+        print(f"📧 To: {email}")
+        print(f"📧 From: Zyneth <no-reply@zyneth.shop>")
+        print(f"📧 OTP CODE: {otp_code}")
+        print(f"📧 (In production with RESEND_API_KEY, this would be sent via email)")
+        print("="*60 + "\n")
+        
+        # Log to file for easy access during development
+        try:
+            with open("otp_logs.txt", "a") as f:
+                timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+                f.write(f"[{timestamp}] {email}: {otp_code}\n")
+        except:
+            pass
+        
+        return False  # Return False to indicate email wasn't really sent
+
+# ========== OTP ENDPOINTS ==========
+
+@router.post("/send-otp")
+async def send_otp(
+    email: str = Form(...),
+    crud = Depends(get_user_crud),
+    background_tasks: BackgroundTasks = None
+):
+    """
+    Send OTP to user's email for verification.
+    This should be called after signup or when user needs to verify email.
+    """
+    # Check if user exists
+    user = await crud.get_user_by_email(email)
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+    
+    # Check if user is already verified
+    if user.is_verified:
+        return {
+            "message": "Email is already verified",
+            "email": email,
+            "success": True
+        }
+    
+    # Check if user is OTP locked
+    if user.otp_locked_until and user.otp_locked_until > datetime.utcnow():
+        time_left = int((user.otp_locked_until - datetime.utcnow()).total_seconds())
+        return {
+            "message": "Too many attempts. Please try again later.",
+            "email": email,
+            "success": False,
+            "retry_after": time_left
+        }
+    
+    # Generate and store OTP
+    otp_code = await crud.generate_and_store_otp(email)
+    if not otp_code:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to generate OTP"
+        )
+    
+    # Send OTP via email (in background)
+    if background_tasks:
+        background_tasks.add_task(EmailService.send_otp_email, email, otp_code)
+    else:
+        await EmailService.send_otp_email(email, otp_code)
+    
+    return {
+        "message": "OTP sent to your email",
+        "email": email,
+        "success": True
+    }
+
+@router.post("/verify-otp")
+async def verify_otp(
+    email: str = Form(...),
+    otp_code: str = Form(...),
+    crud = Depends(get_user_crud)
+):
+    """
+    Verify OTP code.
+    """
+    result = await crud.verify_otp(email, otp_code)
+    
+    if not result["success"]:
+        status_code = 400
+        if result.get("locked"):
+            status_code = 429  # Too Many Requests
+        
+        raise HTTPException(
+            status_code=status_code,
+            detail=result["message"]
+        )
+    
+    return {
+        "message": result["message"],
+        "email": email,
+        "success": True
+    }
+
+@router.post("/resend-otp")
+async def resend_otp(
+    email: str = Form(...),
+    crud = Depends(get_user_crud),
+    background_tasks: BackgroundTasks = None
+):
+    """
+    Resend OTP to user's email.
+    """
+    # Check if user exists
+    user = await crud.get_user_by_email(email)
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+    
+    # Check if user is already verified
+    if user.is_verified:
+        return {
+            "message": "Email is already verified",
+            "email": email,
+            "success": True
+        }
+    
+    # Check if user is OTP locked
+    if user.otp_locked_until and user.otp_locked_until > datetime.utcnow():
+        time_left = int((user.otp_locked_until - datetime.utcnow()).total_seconds())
+        return {
+            "message": "Too many attempts. Please try again later.",
+            "email": email,
+            "success": False,
+            "retry_after": time_left
+        }
+    
+    # Resend OTP
+    otp_code = await crud.resend_otp(email)
+    if not otp_code:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to resend OTP"
+        )
+    
+    # Send OTP via email (in background)
+    if background_tasks:
+        background_tasks.add_task(EmailService.send_otp_email, email, otp_code)
+    else:
+        await EmailService.send_otp_email(email, otp_code)
+    
+    return {
+        "message": "New OTP sent to your email",
+        "email": email,
+        "success": True
+    }
+
+@router.get("/otp-status/{email}")
+async def get_otp_status(
+    email: str,
+    crud = Depends(get_user_crud)
+):
+    """
+    Get OTP verification status for a user.
+    """
+    status_data = await crud.check_otp_status(email)
+    return status_data
+
+# ========== MODIFIED SIGNUP ENDPOINT ==========
+
 @router.post("/signup", response_model=UserOut)
 async def signup(
     full_name: str = Form(...),
@@ -29,12 +368,14 @@ async def signup(
     email: str = Form(...),
     password: str = Form(...),
     confirm_password: str = Form(...),
-    avatar: UploadFile = File(None),  # Renamed from 'file' for clarity
-    crud = Depends(get_user_crud)
+    avatar: UploadFile = File(None),
+    crud = Depends(get_user_crud),
+    background_tasks: BackgroundTasks = None
 ):
     """
-    User registration endpoint.
+    User registration endpoint with OTP verification.
     All new users are registered as regular 'user' role by default.
+    User must verify email with OTP before being able to login.
     """
     print("✅ SIGNUP ENDPOINT HIT!")
     
@@ -91,7 +432,7 @@ async def signup(
         username=username,
         email=email,
         password=password,
-        role=RoleEnum.user  # FIXED: Only 'user' role for self-registration
+        role=RoleEnum.user
     )
     
     # Create user using the existing create_user method
@@ -101,33 +442,20 @@ async def signup(
     
     print(f"✅ User Created Successfully: {user.username} ({user.email})")
     
-    return user
-
-# FIXED: Admin-only endpoint to create users with any role
-@router.post("/admin/create", response_model=UserOut, dependencies=[Depends(require_admin)])
-async def admin_create_user(
-    user_data: AdminUserCreate,
-    crud = Depends(get_user_crud)
-):
-    """
-    Admin-only endpoint to create users with any role.
-    """
-    # Check if user already exists
-    existing_email = await crud.get_user_by_email(user_data.email.lower())
-    existing_username = await crud.get_user_by_username(user_data.username)
-    if existing_email:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    if existing_username:
-        raise HTTPException(status_code=400, detail="Username already taken")
-    
-    # Create user
-    user = await crud.create_user(user_data)
-    if not user:
-        raise HTTPException(status_code=500, detail="Failed to create user")
+    # Generate and send OTP
+    otp_code = await crud.generate_and_store_otp(email)
+    if otp_code:
+        if background_tasks:
+            background_tasks.add_task(EmailService.send_otp_email, email, otp_code)
+        else:
+            await EmailService.send_otp_email(email, otp_code)
+    else:
+        print(f"❌ Failed to generate OTP for {email}")
     
     return user
 
-# FIXED: Login function - simplified for two-role system
+# ========== MODIFIED LOGIN ENDPOINT ==========
+
 @router.post("/login")
 async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
@@ -135,7 +463,7 @@ async def login(
 ):
     """
     User login endpoint.
-    Returns JWT token for Authorization header.
+    Users must verify email with OTP before being able to login.
     """
     identifier = form_data.username.strip()
     print(f"🔍 Login attempt with identifier: '{identifier}'")
@@ -167,6 +495,13 @@ async def login(
             detail="Your account is deactivated. Contact admin."
         )
     
+    # Check if user is verified
+    if not user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Please verify your email address before logging in."
+        )
+    
     # Update last login
     await crud.update_last_login(user.id)
     
@@ -186,9 +521,12 @@ async def login(
             "username": user.username,
             "full_name": user.full_name,
             "avatar_url": user.avatar_url,
-            "is_active": user.is_active
+            "is_active": user.is_active,
+            "is_verified": user.is_verified
         }
     }
+
+# ========== EXISTING ENDPOINTS (UNCHANGED) ==========
 
 @router.get("/me", response_model=UserOut)
 async def get_current_user_profile(
@@ -297,3 +635,27 @@ async def activate_user(
     if not result:
         raise HTTPException(status_code=404, detail="User not found")
     return {"message": f"User {user_id} activated"}
+
+# FIXED: Admin-only endpoint to create users with any role
+@router.post("/admin/create", response_model=UserOut, dependencies=[Depends(require_admin)])
+async def admin_create_user(
+    user_data: AdminUserCreate,
+    crud = Depends(get_user_crud)
+):
+    """
+    Admin-only endpoint to create users with any role.
+    """
+    # Check if user already exists
+    existing_email = await crud.get_user_by_email(user_data.email.lower())
+    existing_username = await crud.get_user_by_username(user_data.username)
+    if existing_email:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    if existing_username:
+        raise HTTPException(status_code=400, detail="Username already taken")
+    
+    # Create user
+    user = await crud.create_user(user_data)
+    if not user:
+        raise HTTPException(status_code=500, detail="Failed to create user")
+    
+    return user

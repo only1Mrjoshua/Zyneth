@@ -102,7 +102,7 @@ class UserFilters(BaseModel):
     """Filters for user queries"""
     role: Optional[RoleEnum] = None
     is_active: Optional[bool] = None
-    search: Optional[str] = None  # Search in full_name, username, email
+    search: Optional[str] = None  
 
 class PaginatedUsers(BaseModel):
     """Response model for paginated user list"""
@@ -111,3 +111,23 @@ class PaginatedUsers(BaseModel):
     page: int
     per_page: int
     total_pages: int
+
+class OTPRequest(BaseModel):
+    """Model for requesting OTP"""
+    email: EmailStr
+
+class OTPVerify(BaseModel):
+    """Model for verifying OTP"""
+    email: EmailStr
+    otp_code: str = Field(..., min_length=6, max_length=6, pattern=r'^\d{6}$')
+
+class OTPResend(BaseModel):
+    """Model for resending OTP"""
+    email: EmailStr
+
+class OTPResponse(BaseModel):
+    """Response model for OTP operations"""
+    message: str
+    email: EmailStr
+    success: bool
+    retry_after: Optional[int] = None  
