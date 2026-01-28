@@ -3,12 +3,15 @@ services:
     name: fastapi-app
     env: python
     buildCommand: |
-      pip install --upgrade pip
-      pip install setuptools wheel
-      pip install -r requirements.txt
+      echo "Starting clean build..."
+      pip install --upgrade pip setuptools wheel
+      pip cache purge  # Clear pip cache
+      pip install --no-cache-dir -r requirements.txt  # Don't use cache
+      echo "Installed packages:"
+      pip list | grep -E "pydantic|email-validator"
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
-    buildFilter:
-      paths:
-        - requirements.txt
-        - render.yaml
-        - runtime.txt
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: ALLOWED_ORIGINS
+        value: "https://zyneth.shop,https://www.zyneth.shop"
