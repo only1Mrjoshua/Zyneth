@@ -668,15 +668,21 @@ async def admin_create_user(
 # google OAuth endpoints
 @router.get("/auth/google")
 async def google_auth_redirect(state: Optional[str] = None):
-    """Return Google OAuth authorization URL"""
     if google_oauth is None:
+        env = os.getenv("ENVIRONMENT")
         raise HTTPException(
             status_code=500,
-            detail="Google OAuth is not configured. Check GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and redirect URI env vars."
+            detail={
+                "error": "Google OAuth not initialized",
+                "ENVIRONMENT": env,
+                "has_GOOGLE_CLIENT_ID": bool(os.getenv("GOOGLE_CLIENT_ID")),
+                "has_GOOGLE_CLIENT_SECRET": bool(os.getenv("GOOGLE_CLIENT_SECRET")),
+                "has_GOOGLE_REDIRECT_URI": bool(os.getenv("GOOGLE_REDIRECT_URI")),
+                "has_GOOGLE_REDIRECT_URI_PROD": bool(os.getenv("GOOGLE_REDIRECT_URI_PROD")),
+            }
         )
 
-    auth_url = google_oauth.get_authorization_url(state)
-    return {"auth_url": auth_url}
+    return {"auth_url": google_oauth.get_authorization_url(state)}
 
 @router.post("/auth/google/callback", response_model=GoogleAuthResponse)
 async def google_auth_callback(request: GoogleAuthRequest):
