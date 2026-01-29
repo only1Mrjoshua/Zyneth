@@ -668,7 +668,13 @@ async def admin_create_user(
 # google OAuth endpoints
 @router.get("/auth/google")
 async def google_auth_redirect(state: Optional[str] = None):
-    """Redirect to Google OAuth page"""
+    """Return Google OAuth authorization URL"""
+    if google_oauth is None:
+        raise HTTPException(
+            status_code=500,
+            detail="Google OAuth is not configured. Check GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and redirect URI env vars."
+        )
+
     auth_url = google_oauth.get_authorization_url(state)
     return {"auth_url": auth_url}
 
