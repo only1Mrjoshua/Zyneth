@@ -17,7 +17,7 @@ const API_BASE_URL = isLocal
 const LOGIN_ENDPOINT = `${API_BASE_URL}/users/login`;
 const ME_ENDPOINT = `${API_BASE_URL}/users/me`;
 const GOOGLE_AUTH_URL_ENDPOINT = `${API_BASE_URL}/users/auth/google`;
-const GOOGLE_AUTH_CALLBACK_ENDPOINT = `${API_BASE_URL}/users/auth/google/web`;
+const GOOGLE_AUTH_CALLBACK_ENDPOINT = `${API_BASE_URL}/users/auth/google/callback`;
 
 /* =========================
    DOM ELEMENTS
@@ -128,7 +128,7 @@ function validateUsername(username) {
 }
 
 function validatePassword(password) {
-  return password.length >= 1; // backend handles strength; keep frontend simple
+  return password.length >= 1;
 }
 
 function showError(element, message) {
@@ -173,44 +173,75 @@ async function validateTokenWithBackend(token) {
 }
 
 /* =========================
-   GOOGLE SIGN-IN HANDLER
+   GOOGLE SIGN-IN HANDLER - UPDATED VERSION
 ========================= */
 class GoogleSignInHandler {
   constructor() {
-    this.googleBtn = googleSignInBtn;
-    this.initialize();
+    this.popupWindow = null;
+    this.authComplete = false;
+    this.popupCheckInterval = null;
+    this.popupClosedByUser = false;
+    this.setupEventListeners();
   }
 
-  initialize() {
-    if (!this.googleBtn) {
+  setupEventListeners() {
+    // Setup Google button click handler
+    this.setupGoogleButton();
+    
+    // Handle messages from popup
+    window.addEventListener('message', this.handlePopupMessage.bind(this));
+  }
+
+  setupGoogleButton() {
+    if (!googleSignInBtn) {
       console.error("Google button not found!");
       return;
     }
 
-    // Remove any existing event listeners by cloning the button
-    const newButton = this.googleBtn.cloneNode(true);
-    this.googleBtn.parentNode.replaceChild(newButton, this.googleBtn);
-    this.googleBtn = newButton;
-
-    // Add click event listener
-    this.googleBtn.addEventListener("click", (e) => this.handleGoogleSignIn(e));
+    // Remove any existing event listeners
+    const newButton = googleSignInBtn.cloneNode(true);
+    googleSignInBtn.parentNode.replaceChild(newButton, googleSignInBtn);
     
-    console.log("Google Sign-In handler initialized");
+    // Add new event listener
+    newButton.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.handleGoogleSignIn();
+    });
+    
+    console.log("Google button handler initialized");
   }
 
-  async handleGoogleSignIn(e) {
-    e.preventDefault();
-    e.stopPropagation();
+  handlePopupMessage(event) {
+    // For security, in production you should check: 
+    // if (event.origin !== window.location.origin) return;
     
+    const data = event.data;
+    
+    if (data && data.type === 'GOOGLE_AUTH_SUCCESS') {
+      console.log('Google auth success, code received');
+      this.authComplete = true;
+      this.handleGoogleAuthSuccess(data.code);
+      
+      // Don't try to close popup - let it close itself
+    } else if (data && data.type === 'GOOGLE_AUTH_ERROR') {
+      console.error('Google auth error from popup:', data.message);
+      toast.error(data.message || 'Google authentication failed', 'Error');
+      this.resetGoogleButton();
+      loadingOverlay.hide();
+    }
+  }
+
+  async handleGoogleSignIn() {
     console.log("Google Sign-In button clicked");
     
-    // Disable button and show loading
-    const originalHTML = this.googleBtn.innerHTML;
-    this.googleBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Connecting...</span>';
-    this.googleBtn.disabled = true;
-    
-    // Show loading overlay
+    // Show loading
     loadingOverlay.show("Connecting to Google...");
+    
+    // Store button state
+    const originalHTML = googleSignInBtn.innerHTML;
+    googleSignInBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Connecting...</span>';
+    googleSignInBtn.disabled = true;
     
     try {
       // Get Google OAuth URL from backend
@@ -223,7 +254,6 @@ class GoogleSignInHandler {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error("Failed to get Google auth URL:", errorText);
         throw new Error(`Failed to get Google auth URL (Status: ${response.status})`);
       }
 
@@ -233,7 +263,7 @@ class GoogleSignInHandler {
         throw new Error("No auth URL returned from server");
       }
       
-      console.log("Google auth URL received:", data.auth_url);
+      console.log("Google auth URL received");
       
       // Open Google OAuth in a popup
       this.openGooglePopup(data.auth_url);
@@ -241,117 +271,133 @@ class GoogleSignInHandler {
     } catch (error) {
       console.error("Google auth error:", error);
       toast.error("Failed to start Google sign-in: " + error.message, "Error");
-      
-      // Restore button
-      this.googleBtn.innerHTML = originalHTML;
-      this.googleBtn.disabled = false;
+      this.resetGoogleButton(originalHTML);
       loadingOverlay.hide();
     }
   }
 
   openGooglePopup(authUrl) {
+    // Close any existing popup
+    if (this.popupWindow && !this.popupWindow.closed) {
+      try {
+        this.popupWindow.close();
+      } catch (e) {
+        // Ignore errors
+      }
+    }
+    
+    // Reset state
+    this.authComplete = false;
+    this.popupClosedByUser = false;
+    
+    // Calculate centered position
     const width = 500;
     const height = 600;
     const left = (window.screen.width - width) / 2;
     const top = (window.screen.height - height) / 2;
     
-    console.log("Opening Google popup:", authUrl);
+    console.log("Opening Google popup");
     
-    const popup = window.open(
+    // Open popup - don't set noopener/noreferrer to allow communication
+    this.popupWindow = window.open(
       authUrl,
-      "Google Sign-In",
-      `width=${width},height=${height},top=${top},left=${left},resizable=yes,scrollbars=yes,status=yes`
+      "GoogleSignIn",
+      `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no,scrollbars=yes,resizable=yes`
     );
-
-    if (!popup) {
-      toast.error("Popup blocked! Please allow popups for this site.", "Popup Blocked");
-      
-      // Restore button
-      const originalHTML = '<i class="fab fa-google"></i><span>Sign in with Google</span>';
-      this.googleBtn.innerHTML = originalHTML;
-      this.googleBtn.disabled = false;
+    
+    if (!this.popupWindow) {
+      toast.error("Popup blocked. Please allow popups for this site.", "Popup Blocked");
+      this.resetGoogleButton();
       loadingOverlay.hide();
       return;
     }
-
-    // Listen for messages from popup
-    const messageHandler = (event) => {
-      // For development, we'll accept messages from any origin
-      // In production, you should check: if (event.origin !== window.location.origin) return;
-      
-      console.log("Message received from popup:", event.data);
-      
-      if (event.data && event.data.type === "GOOGLE_AUTH_SUCCESS") {
-        console.log("Google auth success, code received");
-        this.handleGoogleAuthSuccess(event.data);
-        if (popup) popup.close();
-        window.removeEventListener("message", messageHandler);
-      } else if (event.data && event.data.type === "GOOGLE_AUTH_ERROR") {
-        console.error("Google auth error:", event.data.message);
-        toast.error(event.data.message || "Google authentication failed", "Error");
-        if (popup) popup.close();
-        window.removeEventListener("message", messageHandler);
-        
-        // Restore button
-        const originalHTML = '<i class="fab fa-google"></i><span>Sign in with Google</span>';
-        this.googleBtn.innerHTML = originalHTML;
-        this.googleBtn.disabled = false;
-        loadingOverlay.hide();
-      }
-    };
-
-    window.addEventListener("message", messageHandler, false);
-
-    // Check if popup is closed
-    const checkPopup = setInterval(() => {
-      if (popup && popup.closed) {
-        clearInterval(checkPopup);
-        window.removeEventListener("message", messageHandler);
-        
-        // Restore button if popup closed without completing auth
-        if (!localStorage.getItem("token")) {
-          const originalHTML = '<i class="fab fa-google"></i><span>Sign in with Google</span>';
-          this.googleBtn.innerHTML = originalHTML;
-          this.googleBtn.disabled = false;
-          loadingOverlay.hide();
-          console.log("Popup closed by user");
-        }
-      }
-    }, 500);
+    
+    // Monitor popup with timeout (not using postMessage ping)
+    this.startPopupMonitoring();
   }
 
-  async handleGoogleAuthSuccess(data) {
+  startPopupMonitoring() {
+    // Clear any existing interval
+    if (this.popupCheckInterval) {
+      clearInterval(this.popupCheckInterval);
+    }
+    
+    // Simple timeout approach
+    const startTime = Date.now();
+    const timeoutDuration = 120000; // 2 minutes
+    
+    this.popupCheckInterval = setInterval(() => {
+      if (this.authComplete) {
+        clearInterval(this.popupCheckInterval);
+        return;
+      }
+      
+      // Check if timeout exceeded
+      if (Date.now() - startTime > timeoutDuration) {
+        clearInterval(this.popupCheckInterval);
+        this.handlePopupTimeout();
+      }
+    }, 1000);
+  }
+
+  handlePopupTimeout() {
+    this.popupWindow = null;
+    
+    // Only show timeout if auth wasn't completed
+    if (!this.authComplete) {
+      toast.error('Sign-in timed out. Please try again.', 'Timeout');
+      this.resetGoogleButton();
+      loadingOverlay.hide();
+    }
+  }
+
+  async handleGoogleAuthSuccess(code) {
     try {
       loadingOverlay.show("Completing Google sign-in...");
       
-      console.log("Processing Google auth code:", data.code);
+      console.log('Processing Google auth code');
       
-      // Send authorization code to backend
+      // Try with the correct endpoint
       const response = await fetch(GOOGLE_AUTH_CALLBACK_ENDPOINT, {
-        method: "POST",
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          code: data.code,
-          state: data.state || ""
-        }),
+          code: code
+        })
       });
-
+      
       let responseData;
       try {
         responseData = await response.json();
       } catch (jsonError) {
-        console.error("Failed to parse JSON response:", jsonError);
-        throw new Error("Invalid server response");
+        console.error('Failed to parse JSON response:', jsonError);
+        throw new Error('Invalid server response from Google auth');
       }
-
+      
       if (!response.ok) {
-        console.error("Google auth failed:", responseData);
-        throw new Error(responseData.detail || responseData.message || "Google authentication failed");
+        console.error('Google auth failed - Server response:', responseData);
+        
+        // Special handling for the "from_mongo" error
+        if (responseData.detail && responseData.detail.includes('from_mongo')) {
+          throw new Error('Backend configuration error. Please contact support.');
+        }
+        
+        const errorMessage = responseData.detail || 
+                            responseData.message || 
+                            responseData.error || 
+                            `Google authentication failed (Status: ${response.status})`;
+        throw new Error(errorMessage);
       }
-
-      console.log("Google auth successful:", responseData);
+      
+      console.log('Google auth successful:', responseData);
+      
+      // Validate response structure
+      if (!responseData.access_token || !responseData.user) {
+        console.error('Invalid response structure:', responseData);
+        throw new Error('Invalid response from server - missing token or user data');
+      }
       
       // Store auth data
       localStorage.setItem("token", responseData.access_token);
@@ -370,10 +416,8 @@ class GoogleSignInHandler {
         toast.success("Welcome back!", "Signed In");
       }
       
-      // Restore button
-      const originalHTML = '<i class="fab fa-google"></i><span>Sign in with Google</span>';
-      this.googleBtn.innerHTML = originalHTML;
-      this.googleBtn.disabled = false;
+      // Reset button
+      this.resetGoogleButton();
       
       // Redirect based on role
       const redirectUrl = getRedirectUrlByRole(responseData.user.role);
@@ -383,16 +427,19 @@ class GoogleSignInHandler {
       }, 1000);
       
     } catch (error) {
-      console.error("Google auth processing error:", error);
-      toast.error(error.message || "Google authentication failed", "Error");
+      console.error('Google auth processing error:', error);
+      toast.error(error.message || 'Google authentication failed', 'Error');
       clearAuthStorage();
-      
-      // Restore button
-      const originalHTML = '<i class="fab fa-google"></i><span>Sign in with Google</span>';
-      this.googleBtn.innerHTML = originalHTML;
-      this.googleBtn.disabled = false;
+      this.resetGoogleButton();
     } finally {
       loadingOverlay.hide();
+    }
+  }
+
+  resetGoogleButton() {
+    if (googleSignInBtn) {
+      googleSignInBtn.innerHTML = '<i class="fab fa-google"></i><span>Sign in with Google</span>';
+      googleSignInBtn.disabled = false;
     }
   }
 }
@@ -401,86 +448,91 @@ class GoogleSignInHandler {
    UI LISTENERS
 ========================= */
 // Toggle password
-togglePasswordBtn?.addEventListener("click", function () {
-  const type = passwordInput.getAttribute("type") === "password" ? "text" : "password";
-  passwordInput.setAttribute("type", type);
+if (togglePasswordBtn && passwordInput) {
+  togglePasswordBtn.addEventListener("click", function () {
+    const type = passwordInput.getAttribute("type") === "password" ? "text" : "password";
+    passwordInput.setAttribute("type", type);
 
-  const eyeIcon = this.querySelector("i");
-  if (!eyeIcon) return;
+    const eyeIcon = this.querySelector("i");
+    if (!eyeIcon) return;
 
-  if (type === "text") {
-    eyeIcon.classList.remove("fa-eye");
-    eyeIcon.classList.add("fa-eye-slash");
-  } else {
-    eyeIcon.classList.remove("fa-eye-slash");
-    eyeIcon.classList.add("fa-eye");
-  }
-});
+    if (type === "text") {
+      eyeIcon.classList.remove("fa-eye");
+      eyeIcon.classList.add("fa-eye-slash");
+    } else {
+      eyeIcon.classList.remove("fa-eye-slash");
+      eyeIcon.classList.add("fa-eye");
+    }
+  });
+}
 
 // Real-time validation
-emailInput?.addEventListener("input", function () {
-  const value = this.value.trim();
-  if (!value) {
-    clearError(emailError);
-    this.classList.remove("error", "success");
-    return;
-  }
+if (emailInput) {
+  emailInput.addEventListener("input", function () {
+    const value = this.value.trim();
+    if (!value) {
+      if (emailError) clearError(emailError);
+      this.classList.remove("error", "success");
+      return;
+    }
 
-  if (value.includes("@")) {
-    if (validateEmail(value)) {
-      clearError(emailError);
+    if (value.includes("@")) {
+      if (validateEmail(value)) {
+        if (emailError) clearError(emailError);
+        showSuccess(this);
+      } else {
+        if (emailError) showError(emailError, "Please enter a valid email address");
+      }
+    } else {
+      if (validateUsername(value)) {
+        if (emailError) clearError(emailError);
+        showSuccess(this);
+      } else {
+        if (emailError) showError(emailError, "Username must be 3-20 characters (letters, numbers, underscores)");
+      }
+    }
+  });
+}
+
+if (passwordInput) {
+  passwordInput.addEventListener("input", function () {
+    const value = this.value;
+    if (!value) {
+      if (passwordError) clearError(passwordError);
+      this.classList.remove("error", "success");
+      return;
+    }
+
+    if (validatePassword(value)) {
+      if (passwordError) clearError(passwordError);
       showSuccess(this);
     } else {
-      showError(emailError, "Please enter a valid email address");
+      if (passwordError) showError(passwordError, "Password is required");
     }
-  } else {
-    if (validateUsername(value)) {
-      clearError(emailError);
-      showSuccess(this);
-    } else {
-      showError(emailError, "Username must be 3-20 characters (letters, numbers, underscores)");
-    }
-  }
-});
-
-passwordInput?.addEventListener("input", function () {
-  const value = this.value;
-  if (!value) {
-    clearError(passwordError);
-    this.classList.remove("error", "success");
-    return;
-  }
-
-  if (validatePassword(value)) {
-    clearError(passwordError);
-    showSuccess(this);
-  } else {
-    showError(passwordError, "Password is required");
-  }
-});
-
-// Remove or replace the placeholder Google button handler
-// This is the OLD placeholder - remove it
-// googleSignInBtn?.addEventListener("click", function () {
-//   toast.info("Google sign-in will be available soon!", "Coming Soon");
-// });
+  });
+}
 
 // Remember me autofill
 window.addEventListener("load", function () {
   const rememberedEmail = localStorage.getItem("rememberedEmail");
   const rememberMe = localStorage.getItem("rememberMe");
-  if (rememberMe === "true" && rememberedEmail && emailInput) {
+  const rememberMeCheckbox = document.getElementById("rememberMe");
+  
+  if (rememberMe === "true" && rememberedEmail && emailInput && rememberMeCheckbox) {
     emailInput.value = rememberedEmail;
-    document.getElementById("rememberMe").checked = true;
+    rememberMeCheckbox.checked = true;
   }
 });
 
-document.getElementById("rememberMe")?.addEventListener("change", function () {
-  if (!this.checked) {
-    localStorage.removeItem("rememberMe");
-    localStorage.removeItem("rememberedEmail");
-  }
-});
+const rememberMeCheckbox = document.getElementById("rememberMe");
+if (rememberMeCheckbox) {
+  rememberMeCheckbox.addEventListener("change", function () {
+    if (!this.checked) {
+      localStorage.removeItem("rememberMe");
+      localStorage.removeItem("rememberedEmail");
+    }
+  });
+}
 
 // Input focus effect
 document.querySelectorAll(".input-with-icon input").forEach((input) => {
@@ -494,11 +546,13 @@ document.querySelectorAll(".input-with-icon input").forEach((input) => {
 });
 
 // Ctrl+Enter submit
-signinForm?.addEventListener("keydown", function (e) {
-  if (e.ctrlKey && e.key === "Enter") {
-    this.dispatchEvent(new Event("submit"));
-  }
-});
+if (signinForm) {
+  signinForm.addEventListener("keydown", function (e) {
+    if (e.ctrlKey && e.key === "Enter") {
+      this.dispatchEvent(new Event("submit"));
+    }
+  });
+}
 
 /* =========================
    MAIN SIGNIN HANDLER
@@ -508,25 +562,27 @@ class SigninHandler {
     this.form = signinForm;
     this.signinBtn = signinButton;
 
-    this.form?.addEventListener("submit", (e) => this.handleSubmit(e));
+    if (this.form) {
+      this.form.addEventListener("submit", (e) => this.handleSubmit(e));
+    }
   }
 
   validateForm() {
     let ok = true;
 
-    const identifier = emailInput.value.trim();
-    const password = passwordInput.value;
+    const identifier = emailInput ? emailInput.value.trim() : "";
+    const password = passwordInput ? passwordInput.value : "";
 
-    clearError(emailError);
-    clearError(passwordError);
+    if (emailError) clearError(emailError);
+    if (passwordError) clearError(passwordError);
 
     if (!identifier) {
-      showError(emailError, "Email or username is required");
+      if (emailError) showError(emailError, "Email or username is required");
       ok = false;
     }
 
     if (!password) {
-      showError(passwordError, "Password is required");
+      if (passwordError) showError(passwordError, "Password is required");
       ok = false;
     }
 
@@ -556,9 +612,10 @@ class SigninHandler {
     loadingOverlay.show();
 
     try {
-      const identifier = emailInput.value.trim();
-      const password = passwordInput.value;
-      const rememberMe = document.getElementById("rememberMe").checked;
+      const identifier = emailInput ? emailInput.value.trim() : "";
+      const password = passwordInput ? passwordInput.value : "";
+      const rememberMeCheckbox = document.getElementById("rememberMe");
+      const rememberMe = rememberMeCheckbox ? rememberMeCheckbox.checked : false;
 
       // OAuth2PasswordRequestForm expects x-www-form-urlencoded
       const formData = new URLSearchParams();
@@ -622,10 +679,12 @@ class SigninHandler {
       toast.error(err.message || "Network error. Please try again.", "Login Failed");
 
       // shake
-      this.form.classList.add("shake");
-      setTimeout(() => this.form.classList.remove("shake"), 500);
+      if (this.form) {
+        this.form.classList.add("shake");
+        setTimeout(() => this.form.classList.remove("shake"), 500);
+      }
 
-      passwordInput.value = "";
+      if (passwordInput) passwordInput.value = "";
     } finally {
       loadingOverlay.hide();
       this.setLoading(false);
@@ -634,8 +693,7 @@ class SigninHandler {
 }
 
 /* =========================
-   INIT: VERIFY TOKEN ON LOAD
-   (No more localStorage-only redirects)
+   INITIALIZATION
 ========================= */
 document.addEventListener("DOMContentLoaded", async () => {
   console.log("Sign-in page loaded");
@@ -647,7 +705,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   new SigninHandler();
   new GoogleSignInHandler();
   
-  console.log("Google button element:", googleSignInBtn);
+  console.log("Handlers initialized");
 
   const token = localStorage.getItem("token");
   if (!token) return;
@@ -773,12 +831,12 @@ style.textContent = `
 .shake { animation: shake 0.5s ease-in-out; }
 
 /* Google button loading state */
-.btn-google.loading {
+.btn-google.disabled {
   opacity: 0.7;
   cursor: not-allowed;
 }
 
-.btn-google.loading i.fa-spinner {
+.fa-spinner {
   animation: spin 1s linear infinite;
 }
 

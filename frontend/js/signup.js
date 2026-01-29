@@ -17,7 +17,8 @@ const API_BASE_URL = isLocal
 const SIGNUP_ENDPOINT = `${API_BASE_URL}/users/signup`;
 const VERIFY_OTP_ENDPOINT = `${API_BASE_URL}/users/verify-otp`;
 const RESEND_OTP_ENDPOINT = `${API_BASE_URL}/users/resend-otp`;
-const SEND_OTP_ENDPOINT = `${API_BASE_URL}/users/send-otp`;
+const GOOGLE_AUTH_URL_ENDPOINT = `${API_BASE_URL}/users/auth/google`;
+const GOOGLE_AUTH_CALLBACK_ENDPOINT = `${API_BASE_URL}/users/auth/google/callback`;
 
 /* =========================
    TOAST NOTIFICATIONS
@@ -76,13 +77,317 @@ class ToastNotification {
 const toast = new ToastNotification();
 
 /* =========================
-   HELPERS
+   LOADING OVERLAY
+========================= */
+class LoadingOverlay {
+  constructor() {
+    this.overlay = document.createElement("div");
+    this.overlay.className = "loading-overlay";
+    this.overlay.innerHTML = `
+      <div class="loading-spinner"></div>
+      <div class="loading-text">Processing...</div>
+    `;
+    document.body.appendChild(this.overlay);
+  }
+
+  show(text = "Processing...") {
+    this.overlay.querySelector(".loading-text").textContent = text;
+    this.overlay.classList.add("active");
+    document.body.style.overflow = "hidden";
+  }
+
+  hide() {
+    this.overlay.classList.remove("active");
+    document.body.style.overflow = "";
+  }
+}
+
+const loadingOverlay = new LoadingOverlay();
+
+/* =========================
+   AUTH HELPERS
 ========================= */
 function clearAuthStorage() {
   localStorage.removeItem("user");
   localStorage.removeItem("isAuthenticated");
   localStorage.removeItem("token");
   localStorage.removeItem("token_expires_at");
+}
+
+function getRedirectUrlByRole(role) {
+  return role === "admin" ? "admin-dashboard.html" : "dashboard.html";
+}
+
+/* =========================
+   GOOGLE SIGNUP HANDLER
+========================= */
+class GoogleSignupHandler {
+  constructor() {
+    this.popupWindow = null;
+    this.authComplete = false;
+    this.popupCheckInterval = null;
+    this.popupClosedByUser = false;
+    this.googleBtn = document.getElementById("googleSignupBtn");
+    this.setupEventListeners();
+  }
+
+  setupEventListeners() {
+    // Setup Google button click handler
+    this.setupGoogleButton();
+    
+    // Handle messages from popup
+    window.addEventListener('message', this.handlePopupMessage.bind(this));
+  }
+
+  setupGoogleButton() {
+    if (!this.googleBtn) {
+      console.error("Google signup button not found!");
+      return;
+    }
+
+    // Remove any existing event listeners
+    const newButton = this.googleBtn.cloneNode(true);
+    this.googleBtn.parentNode.replaceChild(newButton, this.googleBtn);
+    this.googleBtn = newButton;
+    
+    // Add new event listener
+    this.googleBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.handleGoogleSignup();
+    });
+    
+    console.log("Google signup button handler initialized");
+  }
+
+  handlePopupMessage(event) {
+    // For security, in production you should check: 
+    // if (event.origin !== window.location.origin) return;
+    
+    const data = event.data;
+    
+    if (data && data.type === 'GOOGLE_AUTH_SUCCESS') {
+      console.log('Google auth success, code received');
+      this.authComplete = true;
+      this.handleGoogleAuthSuccess(data.code);
+    } else if (data && data.type === 'GOOGLE_AUTH_ERROR') {
+      console.error('Google auth error from popup:', data.message);
+      toast.error(data.message || 'Google authentication failed', 'Error');
+      this.resetGoogleButton();
+      loadingOverlay.hide();
+    }
+  }
+
+  async handleGoogleSignup() {
+    console.log("Google Sign-up button clicked");
+    
+    // Show loading
+    loadingOverlay.show("Connecting to Google...");
+    
+    // Store button state
+    const originalHTML = this.googleBtn.innerHTML;
+    this.googleBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Connecting...</span>';
+    this.googleBtn.disabled = true;
+    
+    try {
+      // Get Google OAuth URL from backend
+      const response = await fetch(GOOGLE_AUTH_URL_ENDPOINT, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to get Google auth URL (Status: ${response.status})`);
+      }
+
+      const data = await response.json();
+      
+      if (!data.auth_url) {
+        throw new Error("No auth URL returned from server");
+      }
+      
+      console.log("Google auth URL received");
+      
+      // Open Google OAuth in a popup
+      this.openGooglePopup(data.auth_url);
+      
+    } catch (error) {
+      console.error("Google auth error:", error);
+      toast.error("Failed to start Google sign-up: " + error.message, "Error");
+      this.resetGoogleButton(originalHTML);
+      loadingOverlay.hide();
+    }
+  }
+
+  openGooglePopup(authUrl) {
+    // Close any existing popup
+    if (this.popupWindow && !this.popupWindow.closed) {
+      try {
+        this.popupWindow.close();
+      } catch (e) {
+        // Ignore errors
+      }
+    }
+    
+    // Reset state
+    this.authComplete = false;
+    this.popupClosedByUser = false;
+    
+    // Calculate centered position
+    const width = 500;
+    const height = 600;
+    const left = (window.screen.width - width) / 2;
+    const top = (window.screen.height - height) / 2;
+    
+    console.log("Opening Google popup");
+    
+    // Open popup - don't set noopener/noreferrer to allow communication
+    this.popupWindow = window.open(
+      authUrl,
+      "GoogleSignUp",
+      `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no,scrollbars=yes,resizable=yes`
+    );
+    
+    if (!this.popupWindow) {
+      toast.error("Popup blocked. Please allow popups for this site.", "Popup Blocked");
+      this.resetGoogleButton();
+      loadingOverlay.hide();
+      return;
+    }
+    
+    // Monitor popup with timeout (not using postMessage ping)
+    this.startPopupMonitoring();
+  }
+
+  startPopupMonitoring() {
+    // Clear any existing interval
+    if (this.popupCheckInterval) {
+      clearInterval(this.popupCheckInterval);
+    }
+    
+    // Simple timeout approach
+    const startTime = Date.now();
+    const timeoutDuration = 120000; // 2 minutes
+    
+    this.popupCheckInterval = setInterval(() => {
+      if (this.authComplete) {
+        clearInterval(this.popupCheckInterval);
+        return;
+      }
+      
+      // Check if timeout exceeded
+      if (Date.now() - startTime > timeoutDuration) {
+        clearInterval(this.popupCheckInterval);
+        this.handlePopupTimeout();
+      }
+    }, 1000);
+  }
+
+  handlePopupTimeout() {
+    this.popupWindow = null;
+    
+    // Only show timeout if auth wasn't completed
+    if (!this.authComplete) {
+      toast.error('Sign-up timed out. Please try again.', 'Timeout');
+      this.resetGoogleButton();
+      loadingOverlay.hide();
+    }
+  }
+
+  async handleGoogleAuthSuccess(code) {
+    try {
+      loadingOverlay.show("Completing Google sign-up...");
+      
+      console.log('Processing Google auth code');
+      
+      // Try with the correct endpoint
+      const response = await fetch(GOOGLE_AUTH_CALLBACK_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          code: code
+        })
+      });
+      
+      let responseData;
+      try {
+        responseData = await response.json();
+      } catch (jsonError) {
+        console.error('Failed to parse JSON response:', jsonError);
+        throw new Error('Invalid server response from Google auth');
+      }
+      
+      if (!response.ok) {
+        console.error('Google auth failed - Server response:', responseData);
+        
+        // Special handling for the "from_mongo" error
+        if (responseData.detail && responseData.detail.includes('from_mongo')) {
+          throw new Error('Backend configuration error. Please contact support.');
+        }
+        
+        const errorMessage = responseData.detail || 
+                            responseData.message || 
+                            responseData.error || 
+                            `Google authentication failed (Status: ${response.status})`;
+        throw new Error(errorMessage);
+      }
+      
+      console.log('Google auth successful:', responseData);
+      
+      // Validate response structure
+      if (!responseData.access_token || !responseData.user) {
+        console.error('Invalid response structure:', responseData);
+        throw new Error('Invalid response from server - missing token or user data');
+      }
+      
+      // Store auth data
+      localStorage.setItem("token", responseData.access_token);
+      localStorage.setItem("user", JSON.stringify(responseData.user));
+      localStorage.setItem("isAuthenticated", "true");
+      
+      if (responseData.expires_in) {
+        const expiresAt = Date.now() + responseData.expires_in * 1000;
+        localStorage.setItem("token_expires_at", String(expiresAt));
+      }
+      
+      // Show success message
+      if (responseData.is_new_user) {
+        toast.success("Account created successfully! Welcome to Zyneth!", "Welcome!");
+      } else {
+        toast.success("Welcome back!", "Signed In");
+      }
+      
+      // Reset button
+      this.resetGoogleButton();
+      
+      // Redirect based on role
+      const redirectUrl = getRedirectUrlByRole(responseData.user.role);
+      
+      setTimeout(() => {
+        window.location.href = redirectUrl;
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Google auth processing error:', error);
+      toast.error(error.message || 'Google authentication failed', 'Error');
+      clearAuthStorage();
+      this.resetGoogleButton();
+    } finally {
+      loadingOverlay.hide();
+    }
+  }
+
+  resetGoogleButton() {
+    if (this.googleBtn) {
+      this.googleBtn.innerHTML = '<i class="fab fa-google"></i><span>Sign up with Google</span>';
+      this.googleBtn.disabled = false;
+    }
+  }
 }
 
 /* =========================
@@ -274,7 +579,6 @@ class SignupHandler {
     this.verifyOtpBtn = document.getElementById("verifyOtpBtn");
     this.resendOtpBtn = document.getElementById("resendOtpBtn");
     this.backToSignupBtn = document.getElementById("backToSignup");
-    this.googleBtn = document.getElementById("googleSignupBtn");
     this.terms = document.getElementById("terms");
 
     this.fullName = document.getElementById("fullName");
@@ -303,10 +607,14 @@ class SignupHandler {
 
   initialize() {
     // Signup form events
-    this.form.addEventListener("submit", (e) => this.handleSignupSubmit(e));
+    if (this.form) {
+      this.form.addEventListener("submit", (e) => this.handleSignupSubmit(e));
+    }
 
     // OTP form events
-    this.otpForm.addEventListener("submit", (e) => this.handleOTPSubmit(e));
+    if (this.otpForm) {
+      this.otpForm.addEventListener("submit", (e) => this.handleOTPSubmit(e));
+    }
 
     // Button events
     this.resendOtpBtn?.addEventListener("click", () => this.handleResendOTP());
@@ -318,11 +626,8 @@ class SignupHandler {
       this.toggleVisibility(this.confirmPassword, this.toggleConfirmPasswordBtn)
     );
 
-    // Google signup (placeholder)
-    this.googleBtn?.addEventListener("click", (e) => {
-      e.preventDefault();
-      toast.info("Google sign-up will be available soon!", "Coming Soon");
-    });
+    // Initialize Google signup handler
+    new GoogleSignupHandler();
 
     // Re-validate on input
     [this.fullName, this.username, this.email, this.password, this.confirmPassword].forEach((el) => {
@@ -439,12 +744,12 @@ class SignupHandler {
   validateSignup() {
     let ok = true;
 
-    const fullName = this.fullName.value.trim();
-    const username = this.username.value.trim();
-    const email = this.email.value.trim();
-    const password = this.password.value;
-    const confirmPassword = this.confirmPassword.value;
-    const termsChecked = this.terms.checked;
+    const fullName = this.fullName?.value.trim() || "";
+    const username = this.username?.value.trim() || "";
+    const email = this.email?.value.trim() || "";
+    const password = this.password?.value || "";
+    const confirmPassword = this.confirmPassword?.value || "";
+    const termsChecked = this.terms?.checked || false;
 
     // clear old errors
     this.clearFieldError(this.fullNameError);
@@ -551,12 +856,10 @@ class SignupHandler {
         this.signupBtn.disabled = true;
         this.signupBtn.innerHTML = '<span>Creating Account...</span>';
         this.signupBtn.style.opacity = "0.7";
-        if (this.googleBtn) this.googleBtn.disabled = true;
       } else {
         this.signupBtn.disabled = false;
         this.signupBtn.innerHTML = '<span>Create Account</span><i class="fas fa-arrow-right"></i>';
         this.signupBtn.style.opacity = "1";
-        if (this.googleBtn) this.googleBtn.disabled = false;
         this.updateButtonState();
       }
     }
@@ -722,6 +1025,7 @@ class SignupHandler {
    INIT
 ========================= */
 document.addEventListener("DOMContentLoaded", () => {
+  console.log("Sign-up page loaded");
   new SignupHandler();
 });
 
@@ -787,12 +1091,47 @@ style.textContent = `
 @keyframes slideOut { to { transform: translateX(100%); opacity: 0; } }
 .toast.hide { animation: slideOut 0.3s forwards; }
 
+/* Loading Overlay */
+.loading-overlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(10, 31, 68, 0.95);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 9998;
+  flex-direction: column;
+  gap: 20px;
+  backdrop-filter: blur(5px);
+}
+.loading-overlay.active { display: flex; }
+
+.loading-spinner {
+  width: 60px; height: 60px;
+  border: 4px solid rgba(255, 215, 0, 0.1);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+.loading-text { color: var(--light); font-size: 1.2rem; font-weight: 500; }
+
 @keyframes shake {
   0%,100% { transform: translateX(0); }
   10%,30%,50%,70%,90% { transform: translateX(-5px); }
   20%,40%,60%,80% { transform: translateX(5px); }
 }
 .shake { animation: shake 0.5s ease-in-out; }
+
+/* Google button loading state */
+.btn-google.disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.fa-spinner {
+  animation: spin 1s linear infinite;
+}
 
 /* OTP Success Animation */
 @keyframes otpSuccess {
@@ -829,6 +1168,8 @@ style.textContent = `
 @media (max-width: 768px) {
   .toast-container { top: 80px; right: 10px; left: 10px; max-width: none; }
   .toast { padding: 14px 16px; }
+  .loading-spinner { width: 50px; height: 50px; }
+  .loading-text { font-size: 1rem; }
 }
 `;
 document.head.appendChild(style);

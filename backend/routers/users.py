@@ -1,20 +1,22 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Form, File, UploadFile, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, Form, File, UploadFile, BackgroundTasks, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
+import jwt
 import os, uuid
+import requests
 from bson import ObjectId
 import resend
 from dotenv import load_dotenv
-
 from database import get_database
-from models.user import RoleEnum
+from models.user import RoleEnum, User
 from schemas.user import UserCreate, AdminUserCreate, UserOut, UserLogin
 from utils.security import hash_password, verify_password, create_access_token
 from dependencies import get_current_user, require_admin
-
+from fastapi.responses import HTMLResponse
 from utils.google_auth import google_oauth
 from schemas.google_auth import GoogleAuthRequest, GoogleAuthResponse
+
 
 # Load environment variables
 load_dotenv()
@@ -672,12 +674,151 @@ async def google_auth_redirect(state: Optional[str] = None):
 
 @router.post("/auth/google/callback", response_model=GoogleAuthResponse)
 async def google_auth_callback(request: GoogleAuthRequest):
-    """Handle Google OAuth callback"""
+    """Handle Google OAuth callback - Ultra simplified"""
     try:
+        db = await get_database()      
+        users_collection = db.users
+        
         # Get user info from Google
         user_info = await google_oauth.get_user_info_from_code(request.code)
         
         # Check if user exists by Google ID
+        existing_user = await users_collection.find_one({
+            "$or": [
+                {"google_id": user_info["google_id"]},
+                {"email": user_info["email"]}
+            ]
+        })
+        
+        now = datetime.utcnow()
+        now_iso = now.isoformat()
+        
+        if existing_user:
+            # Update user if they already exist
+            update_data = {
+                "last_login": now,
+                "google_id": user_info["google_id"],
+                "is_google_account": True,
+                "email_verified": user_info["email_verified"],
+                "avatar_url": user_info.get("picture")
+            }
+            
+            await users_collection.update_one(
+                {"_id": existing_user["_id"]},
+                {"$set": update_data}
+            )
+            
+            # Use the existing user data
+            user_dict = {
+                "id": str(existing_user["_id"]),
+                "full_name": existing_user.get("full_name", user_info["full_name"]),
+                "username": existing_user.get("username", ""),
+                "email": existing_user.get("email", user_info["email"]),
+                "role": existing_user.get("role", "user"),  # Get as string
+                "avatar_url": user_info.get("picture") or existing_user.get("avatar_url"),
+                "created_at": existing_user.get("created_at", now).isoformat() if existing_user.get("created_at") else now_iso,
+                "last_login": now_iso,
+                "is_active": existing_user.get("is_active", True),
+                "google_id": user_info["google_id"],
+                "is_google_account": True,
+                "email_verified": user_info["email_verified"],
+                "is_verified": existing_user.get("is_verified", True)
+            }
+            is_new_user = False
+        else:
+            # Generate username from email
+            base_username = user_info["email"].split("@")[0]
+            username = base_username
+            counter = 1
+            while await users_collection.find_one({"username": username}):
+                username = f"{base_username}{counter}"
+                counter += 1
+            
+            # Create new user document
+            new_user_doc = {
+                "full_name": user_info["full_name"],
+                "username": username,
+                "email": user_info["email"],
+                "password_hash": None,
+                "role": "user",
+                "avatar_url": user_info.get("picture"),
+                "created_at": now,
+                "last_login": now,
+                "is_active": True,
+                "is_verified": True,
+                "google_id": user_info["google_id"],
+                "is_google_account": True,
+                "email_verified": user_info["email_verified"]
+            }
+            
+            # Insert new user
+            result = await users_collection.insert_one(new_user_doc)
+            
+            # Create user dict
+            user_dict = {
+                "id": str(result.inserted_id),
+                "full_name": user_info["full_name"],
+                "username": username,
+                "email": user_info["email"],
+                "role": "user",
+                "avatar_url": user_info.get("picture"),
+                "created_at": now_iso,
+                "last_login": now_iso,
+                "is_active": True,
+                "is_verified": True,
+                "google_id": user_info["google_id"],
+                "is_google_account": True,
+                "email_verified": user_info["email_verified"]
+            }
+            is_new_user = True
+        
+        # Generate JWT token
+        token_data = {
+            "sub": user_dict["id"],
+            "email": user_dict["email"],
+            "role": user_dict["role"],  # String role
+            "exp": datetime.utcnow() + timedelta(days=7)
+        }
+        
+        jwt_secret = os.getenv("JWT_SECRET", "your-secret-key")
+        access_token = jwt.encode(token_data, jwt_secret, algorithm="HS256")
+        
+        return GoogleAuthResponse(
+            access_token=access_token,
+            token_type="bearer",
+            expires_in=7 * 24 * 60 * 60,
+            is_new_user=is_new_user,
+            user=user_dict
+        )
+        
+    except Exception as e:
+        import traceback
+        print(f"Error in google_auth_callback: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(
+            status_code=400,
+            detail=f"Google authentication failed: {str(e)}"
+        )
+
+@router.post("/users/auth/google/web", response_model=GoogleAuthResponse)  # Changed endpoint to match frontend
+async def google_auth_web(request: GoogleAuthRequest):
+    """
+    Simplified Google OAuth for web frontend
+    Accepts authorization code directly from frontend
+    """
+    try:
+        # Get database - FIXED: Proper way to get database
+        from ..db.mongodb import get_database  # Import here if needed
+        db = await get_database()      
+        users_collection = db.users
+        
+        # Get the auth code
+        code = request.code
+        
+        # Get user info from Google using your existing google_oauth
+        user_info = await google_oauth.get_user_info_from_code(code)
+        
+        # Find or create user in database
         existing_user = await users_collection.find_one({
             "$or": [
                 {"google_id": user_info["google_id"]},
@@ -695,34 +836,28 @@ async def google_auth_callback(request: GoogleAuthRequest):
                 "avatar_url": user_info.get("picture")
             }
             
-            # Update existing user
             await users_collection.update_one(
                 {"_id": existing_user["_id"]},
                 {"$set": update_data}
             )
             
-            # Get updated user
             updated_user = await users_collection.find_one({"_id": existing_user["_id"]})
-            user_obj = UserOut(**updated_user)
+            user_obj = UserOut.from_mongo(updated_user)
             is_new_user = False
         else:
-            # Create new user with Google data
-            # Generate username from email
+            # Create new user
             base_username = user_info["email"].split("@")[0]
-            
-            # Check if username exists, if so, append random string
             username = base_username
             counter = 1
             while await users_collection.find_one({"username": username}):
                 username = f"{base_username}{counter}"
                 counter += 1
             
-            # Create new user document
             new_user = {
                 "full_name": user_info["full_name"],
                 "username": username,
                 "email": user_info["email"],
-                "password_hash": None,  # No password for Google users
+                "password_hash": None,
                 "role": "user",
                 "avatar_url": user_info.get("picture"),
                 "is_active": True,
@@ -731,17 +866,16 @@ async def google_auth_callback(request: GoogleAuthRequest):
                 "google_id": user_info["google_id"],
                 "is_google_account": True,
                 "email_verified": user_info["email_verified"],
-                "is_verified": True,  # Google verified emails are trusted
+                "is_verified": True,
                 "otp_code": None,
                 "otp_created_at": None,
                 "otp_attempts": 0,
                 "otp_locked_until": None
             }
             
-            # Insert new user
             result = await users_collection.insert_one(new_user)
-            new_user["_id"] = str(result.inserted_id)
-            user_obj = UserOut(**new_user)
+            new_user["_id"] = result.inserted_id
+            user_obj = UserOut.from_mongo(new_user)
             is_new_user = True
         
         # Generate JWT token
@@ -752,14 +886,13 @@ async def google_auth_callback(request: GoogleAuthRequest):
             "exp": datetime.utcnow() + timedelta(days=7)
         }
         
-        # Use your existing JWT secret from .env
         jwt_secret = os.getenv("JWT_SECRET", "your-secret-key")
         access_token = jwt.encode(token_data, jwt_secret, algorithm="HS256")
         
         return GoogleAuthResponse(
             access_token=access_token,
             token_type="bearer",
-            expires_in=7 * 24 * 60 * 60,  # 7 days in seconds
+            expires_in=7 * 24 * 60 * 60,
             is_new_user=is_new_user,
             user=user_obj.dict()
         )
@@ -769,11 +902,61 @@ async def google_auth_callback(request: GoogleAuthRequest):
             status_code=400,
             detail=f"Google authentication failed: {str(e)}"
         )
+    
+# routers/users.py - Add this endpoint
+@router.get("/auth/google/check")
+async def check_google_config():
+    """Check Google OAuth configuration"""
+    return {
+        "client_id": os.getenv("GOOGLE_CLIENT_ID", "NOT SET"),
+        "client_id_preview": f"{os.getenv('GOOGLE_CLIENT_ID', '')[:10]}..." if os.getenv("GOOGLE_CLIENT_ID") else "N/A",
+        "has_client_secret": bool(os.getenv("GOOGLE_CLIENT_SECRET")),
+        "redirect_uri": google_oauth.redirect_uri,
+        "environment": os.getenv("ENVIRONMENT", "development"),
+        "message": "Visit /auth/google/test-url to see the actual OAuth URL"
+    }
 
-@router.post("/auth/google/web", response_model=GoogleAuthResponse)
-async def google_auth_web(request: GoogleAuthRequest):
-    """
-    Simplified Google OAuth for web frontend
-    Accepts authorization code directly from frontend
-    """
-    return await google_auth_callback(request)
+@router.get("/auth/google/test-url")
+async def test_google_url():
+    """Generate a test Google OAuth URL"""
+    auth_url = google_oauth.get_authorization_url()
+    return {
+        "auth_url": auth_url,
+        "decoded_url": "Copy this URL and open in browser to test",
+        "test_link": f'<a href="{auth_url}" target="_blank">Test Google OAuth</a>'
+    }
+
+@router.get("/auth/google/callback", response_class=HTMLResponse)
+async def google_auth_callback_get(request: Request):
+    code = request.query_params.get("code")
+    state = request.query_params.get("state", "")
+
+    # If user cancels or Google errors
+    error = request.query_params.get("error")
+    if error or not code:
+        msg = error or "No code returned from Google"
+        return HTMLResponse(f"""
+        <script>
+          if (window.opener) {{
+            window.opener.postMessage({{
+              type: "GOOGLE_AUTH_ERROR",
+              message: "{msg}"
+            }}, "*");
+          }}
+          window.close();
+        </script>
+        """)
+
+    # Send code to opener (your signin.js is listening)
+    return HTMLResponse(f"""
+    <script>
+      if (window.opener) {{
+        window.opener.postMessage({{
+          type: "GOOGLE_AUTH_SUCCESS",
+          code: "{code}",
+          state: "{state}"
+        }}, "*");
+      }}
+      window.close();
+    </script>
+    """)

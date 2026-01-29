@@ -4,46 +4,95 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Google Authentication</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+        background: #f5f5f5;
+      }
+      .container {
+        text-align: center;
+        padding: 40px;
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+      .success {
+        color: #34a853;
+        font-size: 24px;
+      }
+      .error {
+        color: #ea4335;
+      }
+    </style>
   </head>
   <body>
+    <div class="container">
+      <div id="status">Processing authentication...</div>
+    </div>
+
     <script>
-      // Parse the URL to get the authorization code
+      // Get the authorization code from URL
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get("code");
-      const state = urlParams.get("state");
       const error = urlParams.get("error");
+      const errorDescription = urlParams.get("error_description");
 
-      if (error) {
-        // Send error message to parent window
-        window.opener.postMessage(
-          {
-            type: "GOOGLE_AUTH_ERROR",
-            message: "Google authentication failed: " + error,
-          },
-          window.location.origin,
-        );
-      } else if (code) {
-        // Send success message to parent window
-        window.opener.postMessage(
-          {
-            type: "GOOGLE_AUTH_SUCCESS",
-            code: code,
-            state: state,
-          },
-          window.location.origin,
-        );
-      } else {
-        window.opener.postMessage(
-          {
-            type: "GOOGLE_AUTH_ERROR",
-            message: "No authorization code received",
-          },
-          window.location.origin,
-        );
+      function sendAuthResultToParent() {
+        try {
+          if (error) {
+            // Send error to parent
+            window.opener.postMessage(
+              {
+                type: "google-auth-error",
+                error: error,
+                error_description: errorDescription,
+              },
+              window.opener.location.origin,
+            );
+
+            document.getElementById("status").innerHTML =
+              `<div class="error">Authentication failed: ${errorDescription || error}</div>`;
+            return;
+          }
+
+          if (code) {
+            // Send success with code to parent
+            window.opener.postMessage(
+              {
+                type: "google-auth-success",
+                code: code,
+              },
+              window.opener.location.origin,
+            );
+
+            document.getElementById("status").innerHTML =
+              '<div class="success">✓ Authentication successful! You can close this window.</div>';
+          } else {
+            throw new Error("No authorization code received");
+          }
+        } catch (err) {
+          console.error("Error sending message to parent:", err);
+          document.getElementById("status").innerHTML =
+            `<div class="error">Error: ${err.message}</div>`;
+        }
+
+        // Close window after 1 second
+        setTimeout(() => {
+          try {
+            window.close();
+          } catch (e) {
+            console.log("Popup close blocked by browser");
+          }
+        }, 1000);
       }
 
-      // Close this window
-      window.close();
+      // Run when page loads
+      window.onload = sendAuthResultToParent;
     </script>
   </body>
 </html>
