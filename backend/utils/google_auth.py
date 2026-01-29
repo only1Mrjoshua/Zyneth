@@ -22,18 +22,39 @@ class GoogleOAuth:
             logger.error("GOOGLE_CLIENT_SECRET is not set in environment variables")
             raise ValueError("GOOGLE_CLIENT_SECRET is required")
         
-        # Use different redirect URI based on environment
-        if os.getenv("ENVIRONMENT") == "production":
-            self.redirect_uri = os.getenv("GOOGLE_REDIRECT_URI_PROD")
+        # =============================================
+        # FIXED: Better redirect URI detection for Render
+        # =============================================
+        
+        # Check for Render environment first (most reliable)
+        if os.getenv("RENDER") or os.getenv("ENVIRONMENT") == "production":
+            logger.info("Detected production/Render environment")
+            # Production/Render default
+            self.redirect_uri = "https://zyneth-backend.onrender.com/users/auth/google/callback"
         else:
-            self.redirect_uri = os.getenv("GOOGLE_REDIRECT_URI")
-            
-        if not self.redirect_uri:
-            logger.error("Google redirect URI is not set")
-            raise ValueError("Google redirect URI is required")
-            
+            # Local development
+            self.redirect_uri = "http://localhost:8000/users/auth/google/callback"
+            logger.info("Detected local development environment")
+        
+        # Check for explicit environment variable override (highest priority)
+        env_redirect = os.getenv("GOOGLE_REDIRECT_URI")
+        if env_redirect:
+            self.redirect_uri = env_redirect
+            logger.info(f"Using explicit GOOGLE_REDIRECT_URI from env: {env_redirect}")
+        
+        # Fallback: Check GOOGLE_REDIRECT_URI_PROD for production
+        elif os.getenv("ENVIRONMENT") == "production" and os.getenv("GOOGLE_REDIRECT_URI_PROD"):
+            self.redirect_uri = os.getenv("GOOGLE_REDIRECT_URI_PROD")
+            logger.info(f"Using GOOGLE_REDIRECT_URI_PROD from env: {self.redirect_uri}")
+        
+        # Debug logging
+        logger.info(f"Final redirect_uri determined: {self.redirect_uri}")
         logger.info(f"Google OAuth initialized with client_id: {self.client_id[:10]}...")
-        logger.info(f"Redirect URI: {self.redirect_uri}")
+        
+        # Verify the redirect URI looks valid
+        if not self.redirect_uri or len(self.redirect_uri) < 10:
+            logger.error(f"Invalid redirect URI: {self.redirect_uri}")
+            raise ValueError(f"Invalid redirect URI: {self.redirect_uri}")
     
     def get_authorization_url(self, state: Optional[str] = None) -> str:
         """Generate Google OAuth authorization URL"""
@@ -51,7 +72,11 @@ class GoogleOAuth:
             params["state"] = state
             
         auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
-        logger.debug(f"Generated auth URL: {auth_url[:100]}...")
+        
+        # Log the auth URL (truncated for security)
+        logger.info(f"Generated auth URL for redirect_uri: {self.redirect_uri}")
+        logger.debug(f"Full auth URL: {auth_url[:100]}...")
+        
         return auth_url
     
     async def exchange_code_for_token(self, code: str) -> Dict[str, Any]:
@@ -65,20 +90,24 @@ class GoogleOAuth:
             "grant_type": "authorization_code"
         }
         
-        logger.debug(f"Exchanging code for token with redirect_uri: {self.redirect_uri}")
+        logger.info(f"Exchanging code for token with redirect_uri: {self.redirect_uri}")
+        logger.debug(f"Code length: {len(code)}")
         
         try:
             response = http_requests.post(token_url, data=data, timeout=10)
             
             if response.status_code != 200:
                 logger.error(f"Token exchange failed: {response.status_code} - {response.text}")
+                logger.error(f"Request params - redirect_uri: {self.redirect_uri}")
+                logger.error(f"Request params - client_id: {self.client_id[:10]}...")
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Failed to exchange code for token: {response.text}"
+                    detail=f"Failed to exchange code for token (Status {response.status_code}): {response.text}"
                 )
             
             token_data = response.json()
-            logger.debug(f"Token exchange successful, got id_token: {'id_token' in token_data}")
+            logger.info("Token exchange successful")
+            logger.debug(f"Response keys: {list(token_data.keys())}")
             return token_data
             
         except Exception as e:
@@ -116,7 +145,8 @@ class GoogleOAuth:
                 "locale": idinfo.get("locale", "en")
             }
             
-            logger.debug(f"User info retrieved for: {user_info['email']}")
+            logger.info(f"User info retrieved for: {user_info['email']}")
+            logger.debug(f"User info: {user_info}")
             return user_info
             
         except ValueError as e:
@@ -135,12 +165,13 @@ class GoogleOAuth:
     async def get_user_info_from_code(self, code: str) -> Dict[str, Any]:
         """Get user info directly from authorization code"""
         try:
-            logger.debug(f"Getting user info from code: {code[:20]}...")
+            logger.info(f"Getting user info from code: {code[:20]}...")
             token_data = await self.exchange_code_for_token(code)
             id_token_str = token_data.get("id_token")
             
             if not id_token_str:
                 logger.error("No ID token in response from Google")
+                logger.error(f"Token response keys: {list(token_data.keys())}")
                 raise HTTPException(
                     status_code=400,
                     detail="No ID token in response from Google"
@@ -156,11 +187,29 @@ class GoogleOAuth:
                 status_code=400,
                 detail=f"Failed to process Google authentication: {str(e)}"
             )
+    
+    def get_config_info(self) -> Dict[str, Any]:
+        """Get OAuth configuration for debugging"""
+        return {
+            "client_id_preview": f"{self.client_id[:10]}..." if self.client_id else "NOT SET",
+            "client_id_length": len(self.client_id) if self.client_id else 0,
+            "has_client_secret": bool(self.client_secret),
+            "redirect_uri": self.redirect_uri,
+            "environment": os.getenv("ENVIRONMENT", "unknown"),
+            "is_render": bool(os.getenv("RENDER")),
+            "render_service_id": os.getenv("RENDER_SERVICE_ID"),
+            "render_service_name": os.getenv("RENDER_SERVICE_NAME")
+        }
 
 # Initialize Google OAuth client
 try:
     google_oauth = GoogleOAuth()
     logger.info("Google OAuth initialized successfully")
+    
+    # Log config for debugging
+    config_info = google_oauth.get_config_info()
+    logger.info(f"Google OAuth Config: {config_info}")
+    
 except Exception as e:
     logger.error(f"Failed to initialize Google OAuth: {str(e)}")
     google_oauth = None

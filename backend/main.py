@@ -20,15 +20,13 @@ app.add_middleware(
         "http://127.0.0.1:5500",
         "https://zyneth.shop",           
         "https://www.zyneth.shop",       
-        "https://zyneth-backend.onrender.com", 
-        "http://localhost:8000", 
+        "https://zyneth-backend.onrender.com"
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"],  
+    expose_headers=["*"],
 )
-
 
 # Include user router
 app.include_router(users.router)
