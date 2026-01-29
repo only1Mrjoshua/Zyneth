@@ -13,6 +13,9 @@ from schemas.user import UserCreate, AdminUserCreate, UserOut, UserLogin
 from utils.security import hash_password, verify_password, create_access_token
 from dependencies import get_current_user, require_admin
 
+from utils.google_auth import google_oauth
+from schemas.google_auth import GoogleAuthRequest, GoogleAuthResponse
+
 # Load environment variables
 load_dotenv()
 
@@ -659,3 +662,118 @@ async def admin_create_user(
         raise HTTPException(status_code=500, detail="Failed to create user")
     
     return user
+
+# google OAuth endpoints
+@router.get("/auth/google")
+async def google_auth_redirect(state: Optional[str] = None):
+    """Redirect to Google OAuth page"""
+    auth_url = google_oauth.get_authorization_url(state)
+    return {"auth_url": auth_url}
+
+@router.post("/auth/google/callback", response_model=GoogleAuthResponse)
+async def google_auth_callback(request: GoogleAuthRequest):
+    """Handle Google OAuth callback"""
+    try:
+        # Get user info from Google
+        user_info = await google_oauth.get_user_info_from_code(request.code)
+        
+        # Check if user exists by Google ID
+        existing_user = await users_collection.find_one({
+            "$or": [
+                {"google_id": user_info["google_id"]},
+                {"email": user_info["email"]}
+            ]
+        })
+        
+        if existing_user:
+            # Update user if they already exist
+            update_data = {
+                "last_login": datetime.utcnow(),
+                "google_id": user_info["google_id"],
+                "is_google_account": True,
+                "email_verified": user_info["email_verified"],
+                "avatar_url": user_info.get("picture")
+            }
+            
+            # Update existing user
+            await users_collection.update_one(
+                {"_id": existing_user["_id"]},
+                {"$set": update_data}
+            )
+            
+            # Get updated user
+            updated_user = await users_collection.find_one({"_id": existing_user["_id"]})
+            user_obj = UserOut(**updated_user)
+            is_new_user = False
+        else:
+            # Create new user with Google data
+            # Generate username from email
+            base_username = user_info["email"].split("@")[0]
+            
+            # Check if username exists, if so, append random string
+            username = base_username
+            counter = 1
+            while await users_collection.find_one({"username": username}):
+                username = f"{base_username}{counter}"
+                counter += 1
+            
+            # Create new user document
+            new_user = {
+                "full_name": user_info["full_name"],
+                "username": username,
+                "email": user_info["email"],
+                "password_hash": None,  # No password for Google users
+                "role": "user",
+                "avatar_url": user_info.get("picture"),
+                "is_active": True,
+                "created_at": datetime.utcnow(),
+                "last_login": datetime.utcnow(),
+                "google_id": user_info["google_id"],
+                "is_google_account": True,
+                "email_verified": user_info["email_verified"],
+                "is_verified": True,  # Google verified emails are trusted
+                "otp_code": None,
+                "otp_created_at": None,
+                "otp_attempts": 0,
+                "otp_locked_until": None
+            }
+            
+            # Insert new user
+            result = await users_collection.insert_one(new_user)
+            new_user["_id"] = str(result.inserted_id)
+            user_obj = UserOut(**new_user)
+            is_new_user = True
+        
+        # Generate JWT token
+        token_data = {
+            "sub": str(user_obj.id),
+            "email": user_obj.email,
+            "role": user_obj.role,
+            "exp": datetime.utcnow() + timedelta(days=7)
+        }
+        
+        # Use your existing JWT secret from .env
+        jwt_secret = os.getenv("JWT_SECRET", "your-secret-key")
+        access_token = jwt.encode(token_data, jwt_secret, algorithm="HS256")
+        
+        return GoogleAuthResponse(
+            access_token=access_token,
+            token_type="bearer",
+            expires_in=7 * 24 * 60 * 60,  # 7 days in seconds
+            is_new_user=is_new_user,
+            user=user_obj.dict()
+        )
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Google authentication failed: {str(e)}"
+        )
+
+@router.post("/auth/google/web", response_model=GoogleAuthResponse)
+async def google_auth_web(request: GoogleAuthRequest):
+    """
+    Simplified Google OAuth for web frontend
+    Accepts authorization code directly from frontend
+    """
+    return await google_auth_callback(request)

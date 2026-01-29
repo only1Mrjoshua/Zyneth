@@ -18,7 +18,7 @@ class User(BaseModel):
     full_name: str
     username: str
     email: EmailStr
-    password_hash: str
+    password_hash: Optional[str] = None
     role: RoleEnum = RoleEnum.user
     avatar_url: Optional[str] = None
     created_at: Optional[datetime] = None
@@ -31,6 +31,11 @@ class User(BaseModel):
     is_verified: bool = False
     otp_attempts: int = 0
     otp_locked_until: Optional[datetime] = None
+
+    # Google OAuth fields
+    google_id: Optional[str] = None
+    is_google_account: bool = False
+    email_verified: bool = False
 
     class Config:
         from_attributes = True
