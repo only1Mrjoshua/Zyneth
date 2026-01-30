@@ -17,8 +17,6 @@ const API_BASE_URL = isLocal
 const SIGNUP_ENDPOINT = `${API_BASE_URL}/users/signup`;
 const VERIFY_OTP_ENDPOINT = `${API_BASE_URL}/users/verify-otp`;
 const RESEND_OTP_ENDPOINT = `${API_BASE_URL}/users/resend-otp`;
-const GOOGLE_AUTH_URL_ENDPOINT = `${API_BASE_URL}/users/auth/google`;
-const GOOGLE_AUTH_CALLBACK_ENDPOINT = `${API_BASE_URL}/users/auth/google/callback`;
 
 /* =========================
    TOAST NOTIFICATIONS
@@ -130,165 +128,6 @@ function getRedirectUrlByRole(role) {
       return "/admin-dashboard.html";
     } else {
       return "/dashboard.html";
-    }
-  }
-}
-
-/* =========================
-   GOOGLE SIGNUP HANDLER - DIRECT CALLBACK PROCESSING
-========================= */
-class GoogleSignupHandler {
-  constructor() {
-    this.googleBtn = document.getElementById("googleSignupBtn");
-    this.setupEventListeners();
-    this.processGoogleCallback();
-  }
-
-  setupEventListeners() {
-    if (!this.googleBtn) return;
-
-    const newButton = this.googleBtn.cloneNode(true);
-    this.googleBtn.parentNode.replaceChild(newButton, this.googleBtn);
-    this.googleBtn = newButton;
-    
-    this.googleBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      this.handleGoogleSignup();
-    });
-  }
-
-  async processGoogleCallback() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
-    const error = urlParams.get('error');
-    
-    if (!code && !error) return;
-    
-    console.log("Processing Google callback URL directly on signup page");
-    
-    if (error) {
-      toast.error(`Google authentication failed: ${error}`, "Error");
-      this.cleanUrl();
-      return;
-    }
-    
-    if (code) {
-      loadingOverlay.show("Completing Google sign-up...");
-      
-      try {
-        const response = await fetch(GOOGLE_AUTH_CALLBACK_ENDPOINT, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ code: code })
-        });
-        
-        let responseData;
-        try {
-          responseData = await response.json();
-        } catch (jsonError) {
-          throw new Error('Invalid server response from Google auth');
-        }
-        
-        if (!response.ok) {
-          const errorMessage = responseData.detail || 
-                              responseData.message || 
-                              responseData.error || 
-                              `Google authentication failed (Status: ${response.status})`;
-          throw new Error(errorMessage);
-        }
-        
-        if (!responseData.access_token || !responseData.user) {
-          throw new Error('Invalid response from server - missing token or user data');
-        }
-        
-        localStorage.setItem("token", responseData.access_token);
-        localStorage.setItem("user", JSON.stringify(responseData.user));
-        localStorage.setItem("isAuthenticated", "true");
-        
-        if (responseData.expires_in) {
-          const expiresAt = Date.now() + responseData.expires_in * 1000;
-          localStorage.setItem("token_expires_at", String(expiresAt));
-        }
-        
-        if (responseData.is_new_user) {
-          toast.success("Account created successfully! Welcome to Zyneth!", "Welcome!");
-        } else {
-          toast.success("Welcome back!", "Signed In");
-        }
-        
-        this.cleanUrl();
-        
-        const redirectUrl = getRedirectUrlByRole(responseData.user.role);
-        
-        setTimeout(() => {
-          window.location.href = redirectUrl;
-        }, 1000);
-        
-      } catch (error) {
-        console.error('Google auth processing error:', error);
-        toast.error(error.message || 'Google authentication failed', 'Error');
-        clearAuthStorage();
-        this.cleanUrl();
-        loadingOverlay.hide();
-      }
-    }
-  }
-
-  cleanUrl() {
-    const cleanUrl = window.location.pathname;
-    window.history.replaceState({}, document.title, cleanUrl);
-  }
-
-  setGoogleButtonLoading(isLoading) {
-    if (!this.googleBtn) return;
-    
-    if (isLoading) {
-      this.googleBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Redirecting...</span>';
-      this.googleBtn.disabled = true;
-      this.googleBtn.classList.add('disabled');
-    } else {
-      this.googleBtn.innerHTML = '<i class="fab fa-google"></i><span>Sign up with Google</span>';
-      this.googleBtn.disabled = false;
-      this.googleBtn.classList.remove('disabled');
-    }
-  }
-
-  async handleGoogleSignup() {
-    console.log("Starting Google Sign-Up");
-    
-    loadingOverlay.show("Redirecting to Google...");
-    this.setGoogleButtonLoading(true);
-    
-    try {
-      const response = await fetch(GOOGLE_AUTH_URL_ENDPOINT, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to get Google auth URL (Status: ${response.status})`);
-      }
-
-      const data = await response.json();
-      
-      if (!data.auth_url) {
-        throw new Error("No auth URL returned from server");
-      }
-      
-      window.location.href = data.auth_url;
-      
-    } catch (error) {
-      console.error("Google auth error:", error);
-      toast.error("Failed to start Google sign-up: " + error.message, "Error");
-      this.setGoogleButtonLoading(false);
-      loadingOverlay.hide();
     }
   }
 }
@@ -516,8 +355,6 @@ class SignupHandler {
     this.toggleConfirmPasswordBtn?.addEventListener("click", () =>
       this.toggleVisibility(this.confirmPassword, this.toggleConfirmPasswordBtn)
     );
-
-    new GoogleSignupHandler();
 
     [this.fullName, this.username, this.email, this.password, this.confirmPassword].forEach((el) => {
       el?.addEventListener("input", () => this.updateButtonState());
