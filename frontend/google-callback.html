@@ -3,96 +3,341 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Google Authentication</title>
+    <title>Signing In - Zyneth</title>
+    <link rel="stylesheet" href="css/signin.css" />
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="images/favicon.ico" />
+    <link rel="apple-touch-icon" href="images/apple-touch-icon.png" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Inter:wght@300;400;500&display=swap"
+      rel="stylesheet"
+    />
     <style>
-      body {
-        font-family: Arial, sans-serif;
+      .callback-container {
+        min-height: 100vh;
         display: flex;
         justify-content: center;
         align-items: center;
-        height: 100vh;
-        margin: 0;
-        background: #f5f5f5;
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        padding: 20px;
       }
-      .container {
-        text-align: center;
+
+      .callback-card {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
         padding: 40px;
-        background: white;
-        border-radius: 10px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        text-align: center;
+        max-width: 500px;
+        width: 100%;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
       }
-      .success {
-        color: #34a853;
+
+      .callback-icon {
+        font-size: 64px;
+        color: #3b82f6;
+        margin-bottom: 20px;
+      }
+
+      .callback-title {
         font-size: 24px;
+        color: white;
+        margin-bottom: 10px;
+        font-weight: 600;
       }
-      .error {
-        color: #ea4335;
+
+      .callback-message {
+        color: #94a3b8;
+        margin-bottom: 30px;
+        line-height: 1.6;
+      }
+
+      .spinner {
+        width: 50px;
+        height: 50px;
+        border: 4px solid rgba(59, 130, 246, 0.3);
+        border-top-color: #3b82f6;
+        border-radius: 50%;
+        margin: 30px auto;
+        animation: spin 1s linear infinite;
+      }
+
+      .error-message {
+        background: rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        border-radius: 10px;
+        padding: 15px;
+        margin: 20px 0;
+        color: #fca5a5;
+      }
+
+      .btn-retry {
+        background: #3b82f6;
+        color: white;
+        border: none;
+        padding: 12px 30px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        margin-top: 20px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.3s ease;
+      }
+
+      .btn-retry:hover {
+        background: #2563eb;
+        transform: translateY(-2px);
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .user-info {
+        background: rgba(59, 130, 246, 0.1);
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        border-radius: 10px;
+        padding: 15px;
+        margin: 20px 0;
+        text-align: left;
+      }
+
+      .user-info p {
+        margin: 8px 0;
+        color: #e2e8f0;
+      }
+
+      .user-info strong {
+        color: #3b82f6;
       }
     </style>
   </head>
   <body>
-    <div class="container">
-      <div id="status">Processing authentication...</div>
+    <div class="callback-container">
+      <div class="callback-card">
+        <div class="callback-icon">
+          <i class="fas fa-user-check" id="statusIcon"></i>
+        </div>
+        <h1 class="callback-title" id="statusTitle">Completing Sign-In</h1>
+        <p class="callback-message" id="statusMessage">
+          Please wait while we sign you in with Google...
+        </p>
+
+        <div class="spinner" id="loadingSpinner"></div>
+
+        <div id="userInfoContainer" style="display: none">
+          <div class="user-info">
+            <p><strong>Email:</strong> <span id="userEmail"></span></p>
+            <p><strong>Status:</strong> <span id="userStatus"></span></p>
+          </div>
+        </div>
+
+        <div id="errorContainer" style="display: none">
+          <div class="error-message" id="errorMessage"></div>
+          <button
+            class="btn-retry"
+            onclick="window.location.href = 'signin.html'"
+          >
+            <i class="fas fa-arrow-left"></i>
+            Return to Sign In
+          </button>
+        </div>
+      </div>
     </div>
 
     <script>
-      // Get the authorization code from URL
-      const urlParams = new URLSearchParams(window.location.search);
-      const code = urlParams.get("code");
-      const error = urlParams.get("error");
-      const errorDescription = urlParams.get("error_description");
+      // Configuration
+      const isLocal =
+        window.location.hostname.includes("localhost") ||
+        window.location.hostname.includes("127.0.0.1") ||
+        window.location.hostname.endsWith(".local");
 
-      function sendAuthResultToParent() {
-        try {
-          if (error) {
-            // Send error to parent
-            window.opener.postMessage(
-              {
-                type: "google-auth-error",
-                error: error,
-                error_description: errorDescription,
-              },
-              window.opener.location.origin,
-            );
+      const API_BASE_URL = isLocal
+        ? "http://localhost:8000"
+        : "https://zyneth-backend.onrender.com";
 
-            document.getElementById("status").innerHTML =
-              `<div class="error">Authentication failed: ${errorDescription || error}</div>`;
-            return;
-          }
+      // DOM Elements
+      const statusIcon = document.getElementById("statusIcon");
+      const statusTitle = document.getElementById("statusTitle");
+      const statusMessage = document.getElementById("statusMessage");
+      const loadingSpinner = document.getElementById("loadingSpinner");
+      const userInfoContainer = document.getElementById("userInfoContainer");
+      const userEmail = document.getElementById("userEmail");
+      const userStatus = document.getElementById("userStatus");
+      const errorContainer = document.getElementById("errorContainer");
+      const errorMessage = document.getElementById("errorMessage");
 
-          if (code) {
-            // Send success with code to parent
-            window.opener.postMessage(
-              {
-                type: "google-auth-success",
-                code: code,
-              },
-              window.opener.location.origin,
-            );
-
-            document.getElementById("status").innerHTML =
-              '<div class="success">✓ Authentication successful! You can close this window.</div>';
-          } else {
-            throw new Error("No authorization code received");
-          }
-        } catch (err) {
-          console.error("Error sending message to parent:", err);
-          document.getElementById("status").innerHTML =
-            `<div class="error">Error: ${err.message}</div>`;
-        }
-
-        // Close window after 1 second
-        setTimeout(() => {
-          try {
-            window.close();
-          } catch (e) {
-            console.log("Popup close blocked by browser");
-          }
-        }, 1000);
+      // Auth helper functions
+      function clearAuthStorage() {
+        localStorage.removeItem("user");
+        localStorage.removeItem("isAuthenticated");
+        localStorage.removeItem("token");
+        localStorage.removeItem("token_expires_at");
       }
 
-      // Run when page loads
-      window.onload = sendAuthResultToParent;
+      function getRedirectUrlByRole(role) {
+        return role === "admin" ? "admin-dashboard.html" : "dashboard.html";
+      }
+
+      async function validateTokenWithBackend(token) {
+        try {
+          const response = await fetch(`${API_BASE_URL}/users/me`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          });
+
+          if (!response.ok) {
+            console.error(
+              "Token validation failed:",
+              response.status,
+              response.statusText,
+            );
+            return null;
+          }
+          return await response.json();
+        } catch (error) {
+          console.error("Token validation error:", error);
+          return null;
+        }
+      }
+
+      function showSuccessUI(email, isNewUser) {
+        statusIcon.className = "fas fa-check-circle";
+        statusIcon.style.color = "#10B981";
+        statusTitle.textContent = "Success!";
+        statusMessage.textContent = isNewUser
+          ? `Welcome to Zyneth, ${email}! Your account has been created.`
+          : `Welcome back, ${email}!`;
+
+        userEmail.textContent = email;
+        userStatus.textContent = isNewUser
+          ? "New Account Created"
+          : "Existing Account";
+        userInfoContainer.style.display = "block";
+      }
+
+      function showErrorUI(message) {
+        loadingSpinner.style.display = "none";
+        statusIcon.className = "fas fa-times-circle";
+        statusIcon.style.color = "#EF4444";
+        statusTitle.textContent = "Sign-In Failed";
+        statusMessage.textContent =
+          "There was a problem completing your sign-in.";
+        errorContainer.style.display = "block";
+        errorMessage.textContent = message;
+      }
+
+      async function handleGoogleCallback() {
+        try {
+          // Get token from URL parameters
+          const urlParams = new URLSearchParams(window.location.search);
+          const token = urlParams.get("token");
+          const userId = urlParams.get("user_id");
+          const email = urlParams.get("email");
+
+          console.log("Google callback parameters:", {
+            token: token ? "present" : "missing",
+            userId,
+            email,
+          });
+
+          if (!token) {
+            throw new Error("No authentication token received from Google");
+          }
+
+          // Validate token with backend
+          statusMessage.textContent = "Verifying your session...";
+          const userData = await validateTokenWithBackend(token);
+
+          if (!userData) {
+            throw new Error(
+              "Invalid authentication token. Please try signing in again.",
+            );
+          }
+
+          console.log("User data received:", userData);
+
+          // Check if this is a new user (determined by recent creation)
+          const isNewUser =
+            !userData.last_login ||
+            new Date() - new Date(userData.last_login) > 60000; // Created in last minute
+
+          // Show success UI
+          showSuccessUI(userData.email || email, isNewUser);
+
+          // Store auth data
+          localStorage.setItem("token", token);
+          localStorage.setItem("user", JSON.stringify(userData));
+          localStorage.setItem("isAuthenticated", "true");
+
+          // Set 30-day expiration
+          const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
+          localStorage.setItem("token_expires_at", String(expiresAt));
+
+          // Wait a moment to show success message, then redirect
+          setTimeout(() => {
+            statusMessage.textContent = "Redirecting to your dashboard...";
+            loadingSpinner.style.display = "block";
+
+            setTimeout(() => {
+              const redirectUrl = getRedirectUrlByRole(userData.role);
+              window.location.href = redirectUrl;
+            }, 1500);
+          }, 2000);
+        } catch (error) {
+          console.error("Google callback error:", error);
+          showErrorUI(
+            error.message ||
+              "Failed to complete Google sign-in. Please try again.",
+          );
+
+          // Clear any invalid auth data
+          clearAuthStorage();
+        }
+      }
+
+      // Check for error in URL parameters first
+      const urlParams = new URLSearchParams(window.location.search);
+      const error = urlParams.get("error");
+
+      if (error) {
+        // Handle direct error from backend redirect
+        loadingSpinner.style.display = "none";
+        statusMessage.style.display = "none";
+
+        const errorMessages = {
+          google_auth_failed: "Google authentication failed. Please try again.",
+          no_auth_code: "Authentication code missing. Please try again.",
+          invalid_state: "Security validation failed. Please try again.",
+          server_error: "Server error occurred. Please try again.",
+          oauth_not_configured: "Google OAuth is not configured on the server.",
+        };
+
+        showErrorUI(errorMessages[error] || "Authentication failed");
+        clearAuthStorage();
+      } else {
+        // Normal flow - handle Google callback
+        handleGoogleCallback();
+      }
+
+      // Auto-redirect to signin if no action after 10 seconds
+      setTimeout(() => {
+        if (!localStorage.getItem("token")) {
+          console.log("Auto-redirecting to signin due to timeout");
+          window.location.href = "signin.html";
+        }
+      }, 10000);
     </script>
   </body>
 </html>

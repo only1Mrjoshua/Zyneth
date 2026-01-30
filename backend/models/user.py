@@ -1,4 +1,3 @@
-# models/user.py
 from typing import Optional
 from datetime import datetime
 from pydantic import BaseModel, EmailStr
@@ -13,6 +12,10 @@ class GenderEnum(str, enum.Enum):
     female = "female"
     other = "other"
 
+class AuthProviderEnum(str, enum.Enum):
+    email = "email"
+    google = "google"
+
 class User(BaseModel):
     id: Optional[str] = None
     full_name: str
@@ -20,6 +23,7 @@ class User(BaseModel):
     email: EmailStr
     password_hash: Optional[str] = None
     role: RoleEnum = RoleEnum.user
+    auth_provider: AuthProviderEnum = AuthProviderEnum.email  # NEW FIELD
     avatar_url: Optional[str] = None
     created_at: Optional[datetime] = None
     last_login: Optional[datetime] = None

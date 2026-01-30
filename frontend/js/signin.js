@@ -16,6 +16,7 @@ const API_BASE_URL = isLocal
 
 const LOGIN_ENDPOINT = `${API_BASE_URL}/users/login`;
 const ME_ENDPOINT = `${API_BASE_URL}/users/me`;
+const GOOGLE_LOGIN_ENDPOINT = `${API_BASE_URL}/auth/google/login`;
 
 /* =========================
    DOM ELEMENTS
@@ -168,6 +169,62 @@ async function validateTokenWithBackend(token) {
 
   if (!res.ok) return null;
   return await res.json();
+}
+
+/* =========================
+   GOOGLE OAUTH HANDLER
+========================= */
+class GoogleAuthHandler {
+  constructor() {
+    this.googleBtn = googleSignInBtn;
+    this.isProcessing = false;
+    
+    if (this.googleBtn) {
+      this.googleBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.initiateGoogleSignIn();
+      });
+    }
+  }
+  
+  async initiateGoogleSignIn() {
+    if (this.isProcessing) return;
+    
+    try {
+      this.isProcessing = true;
+      
+      // Disable button during process
+      if (this.googleBtn) {
+        this.googleBtn.disabled = true;
+        this.googleBtn.innerHTML = '<i class="fab fa-google fa-spin"></i><span>Connecting to Google...</span>';
+        this.googleBtn.classList.add('disabled');
+      }
+      
+      // Show loading overlay
+      loadingOverlay.show("Connecting to Google...");
+      
+      // Redirect to backend Google auth endpoint
+      // The backend will handle the OAuth flow and redirect to google-callback.html
+      window.location.href = GOOGLE_LOGIN_ENDPOINT;
+      
+    } catch (error) {
+      console.error('Google sign-in error:', error);
+      toast.error('Failed to initiate Google sign-in', 'Google Sign-In Error');
+      
+      // Re-enable button
+      this.resetGoogleButton();
+      loadingOverlay.hide();
+    }
+  }
+  
+  resetGoogleButton() {
+    this.isProcessing = false;
+    if (this.googleBtn) {
+      this.googleBtn.disabled = false;
+      this.googleBtn.innerHTML = '<i class="fab fa-google"></i><span>Sign in with Google</span>';
+      this.googleBtn.classList.remove('disabled');
+    }
+  }
 }
 
 /* =========================
@@ -424,11 +481,34 @@ class SigninHandler {
 document.addEventListener("DOMContentLoaded", async () => {
   console.log("Sign-in page loaded");
   
+  // Check for error parameters in URL (from Google callback failure)
+  const urlParams = new URLSearchParams(window.location.search);
+  const error = urlParams.get('error');
+  const message = urlParams.get('message');
+  
+  if (error) {
+    const errorMessages = {
+      'google_auth_failed': 'Google authentication failed. Please try again.',
+      'no_auth_code': 'Authentication code missing. Please try again.',
+      'invalid_state': 'Security validation failed. Please try again.',
+      'server_error': 'Server error occurred. Please try again.'
+    };
+    
+    toast.error(
+      errorMessages[error] || message || 'Authentication failed',
+      'Sign-In Error'
+    );
+    
+    // Clear error from URL
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+
   // Focus email field
   if (emailInput && !emailInput.value) emailInput.focus();
 
   // Initialize handlers
   new SigninHandler();
+  new GoogleAuthHandler();  // Initialize Google OAuth handler
   
   console.log("Handlers initialized");
 
@@ -559,9 +639,10 @@ style.textContent = `
 .btn-google.disabled {
   opacity: 0.7;
   cursor: not-allowed;
+  pointer-events: none;
 }
 
-.fa-spinner {
+.btn-google.disabled i.fa-spin {
   animation: spin 1s linear infinite;
 }
 

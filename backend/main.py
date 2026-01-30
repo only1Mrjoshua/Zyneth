@@ -3,8 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
 
-# Import your user router
+# Import routers
 from routers import users
+from routers import auth  # NEW: Import auth router
 
 app = FastAPI()
 
@@ -12,7 +13,7 @@ app = FastAPI()
 os.makedirs("static/avatars", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# main.py - Update your CORS middleware
+# CORS middleware - UPDATED to include more origins and cookie support
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -20,16 +21,18 @@ app.add_middleware(
         "http://127.0.0.1:5500",
         "https://zyneth.shop",           
         "https://www.zyneth.shop",       
-        "https://zyneth-backend.onrender.com"
+        "https://zyneth-backend.onrender.com",
+        "http://localhost:8000",  # For local development
     ],
-    allow_credentials=True,
+    allow_credentials=True,  # Important for cookies
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],
 )
 
-# Include user router
+# Include routers
 app.include_router(users.router)
+app.include_router(auth.router)  # NEW: Include auth router
 
 @app.get("/")
 async def root():

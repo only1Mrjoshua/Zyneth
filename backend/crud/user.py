@@ -3,8 +3,9 @@ from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from datetime import datetime, timedelta
 import random
+import string
 
-from models.user import User, RoleEnum
+from models.user import User, RoleEnum, AuthProviderEnum
 from schemas.user import UserCreate, AdminUserCreate
 from utils.security import hash_password
 
@@ -80,9 +81,15 @@ class UserCRUD:
             print(f"❌ Error getting user by ID: {e}")
             return None
 
-    async def create_user(self, user_data: UserCreate, avatar_url: str = None) -> Optional[User]:
+    async def create_user(
+        self, 
+        user_data: UserCreate, 
+        avatar_url: str = None, 
+        is_verified: bool = False,
+        auth_provider: str = "email"  # NEW parameter for Google OAuth
+    ) -> Optional[User]:
         """
-        Create a new user.
+        Create a new user with optional auth provider.
         First user becomes admin, subsequent users get the role from user_data.
         """
         if not await self._is_connected():
@@ -107,8 +114,9 @@ class UserCRUD:
                 "full_name": user_data.full_name,
                 "username": user_data.username,
                 "email": user_data.email.lower(),
-                "password_hash": hash_password(user_data.password),
+                "password_hash": hash_password(user_data.password) if user_data.password else None,
                 "role": role,
+                "auth_provider": auth_provider,  # NEW: Store auth provider
                 "avatar_url": avatar_url,
                 "created_at": datetime.utcnow(),
                 "last_login": None,
@@ -116,7 +124,7 @@ class UserCRUD:
                 # OTP fields
                 "otp_code": None,
                 "otp_created_at": None,
-                "is_verified": False,
+                "is_verified": is_verified,  # Google users are pre-verified
                 "otp_attempts": 0,
                 "otp_locked_until": None
             }
@@ -137,6 +145,85 @@ class UserCRUD:
             
         except Exception as e:
             print(f"❌ Error creating user: {e}")
+            return None
+
+    async def create_google_user(
+        self,
+        email: str,
+        full_name: str,
+        picture: str = None,
+        google_id: str = None
+    ) -> Optional[User]:
+        """
+        Create a new user from Google OAuth.
+        """
+        if not await self._is_connected():
+            return None
+            
+        try:
+            # Check if user already exists
+            existing_user = await self.get_user_by_email(email)
+            if existing_user:
+                # Update user with Google info if needed
+                update_data = {
+                    "last_login": datetime.utcnow(),
+                    "auth_provider": AuthProviderEnum.google,
+                    "is_verified": True
+                }
+                if picture and not existing_user.avatar_url:
+                    update_data["avatar_url"] = picture
+                
+                return await self.update_user(existing_user.id, update_data)
+
+            # Generate username from email (prefix before @)
+            username_base = email.split("@")[0].replace('.', '_').lower()
+            username = username_base
+            
+            # Ensure username is unique
+            counter = 1
+            while await self.get_user_by_username(username):
+                username = f"{username_base}{counter}"
+                counter += 1
+
+            # Determine role (first user becomes admin)
+            user_count = await self.db.users.count_documents({})
+            role = RoleEnum.admin if user_count == 0 else RoleEnum.user
+
+            # Generate a random password (won't be used for Google auth users)
+            random_password = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
+
+            # Create user document for Google user
+            user_dict = {
+                "full_name": full_name,
+                "username": username,
+                "email": email.lower(),
+                "password_hash": hash_password(random_password),
+                "role": role,
+                "auth_provider": AuthProviderEnum.google,
+                "avatar_url": picture,
+                "created_at": datetime.utcnow(),
+                "last_login": datetime.utcnow(),
+                "is_active": True,
+                # OTP fields
+                "otp_code": None,
+                "otp_created_at": None,
+                "is_verified": True,  # Google emails are already verified
+                "otp_attempts": 0,
+                "otp_locked_until": None
+            }
+
+            result = await self.db.users.insert_one(user_dict)
+            
+            created_user = await self.db.users.find_one({"_id": result.inserted_id})
+            
+            if created_user:
+                created_user = self._convert_objectids_to_strings(created_user)
+                return User(**created_user)
+            
+            return None
+            
+        except Exception as e:
+            print(f"❌ Error creating Google user: {e}")
             return None
 
     async def update_user(self, user_id: str, update_data: dict) -> Optional[User]:
