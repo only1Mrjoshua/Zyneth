@@ -216,14 +216,16 @@
         statusIcon.className = "fas fa-check-circle";
         statusIcon.style.color = "#10B981";
         statusTitle.textContent = "Success!";
-        statusMessage.textContent = isNewUser
-          ? `Welcome to Zyneth, ${email}! Your account has been created.`
-          : `Welcome back, ${email}!`;
+
+        if (isNewUser) {
+          statusMessage.textContent = `Welcome to Zyneth, ${email}! Your account has been created.`;
+          userStatus.textContent = "New Account Created";
+        } else {
+          statusMessage.textContent = `Welcome back, ${email}!`;
+          userStatus.textContent = "Existing Account";
+        }
 
         userEmail.textContent = email;
-        userStatus.textContent = isNewUser
-          ? "New Account Created"
-          : "Existing Account";
         userInfoContainer.style.display = "block";
       }
 
@@ -236,6 +238,36 @@
           "There was a problem completing your sign-in.";
         errorContainer.style.display = "block";
         errorMessage.textContent = message;
+      }
+
+      // NEW: Improved function to check if user is new
+      function checkIfUserIsNew(userData) {
+        // Check if user has last_login property and it's not null/undefined
+        const hasLastLogin =
+          userData.last_login &&
+          userData.last_login !== null &&
+          userData.last_login !== undefined;
+
+        // If user doesn't have last_login, they're new
+        if (!hasLastLogin) {
+          return true;
+        }
+
+        // If last_login exists, check if it's very recent (within last 5 minutes)
+        // which might indicate a brand new account
+        try {
+          const lastLoginTime = new Date(userData.last_login).getTime();
+          const currentTime = Date.now();
+          const timeSinceLogin = currentTime - lastLoginTime;
+
+          // If last login was more than 5 minutes ago, user is NOT new
+          // If last login was within 5 minutes AND it's their first record, they might be new
+          // We'll assume they're existing if last login > 5 min ago
+          return timeSinceLogin < 5 * 60 * 1000; // 5 minutes
+        } catch (e) {
+          console.error("Error parsing last_login:", e);
+          return false; // If we can't parse, assume existing user
+        }
       }
 
       async function handleGoogleCallback() {
@@ -268,10 +300,8 @@
 
           console.log("User data received:", userData);
 
-          // Check if this is a new user (determined by recent creation)
-          const isNewUser =
-            !userData.last_login ||
-            new Date() - new Date(userData.last_login) > 60000; // Created in last minute
+          // FIXED: Use improved logic to check if user is new
+          const isNewUser = checkIfUserIsNew(userData);
 
           // Show success UI
           showSuccessUI(userData.email || email, isNewUser);
