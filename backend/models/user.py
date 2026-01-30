@@ -32,11 +32,6 @@ class User(BaseModel):
     otp_attempts: int = 0
     otp_locked_until: Optional[datetime] = None
 
-    # Google OAuth fields
-    google_id: Optional[str] = None
-    is_google_account: bool = False
-    email_verified: bool = False
-
     class Config:
         from_attributes = True
         use_enum_values = True

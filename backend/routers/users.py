@@ -13,9 +13,6 @@ from models.user import RoleEnum, User
 from schemas.user import UserCreate, AdminUserCreate, UserOut, UserLogin
 from utils.security import hash_password, verify_password, create_access_token
 from dependencies import get_current_user, require_admin
-from fastapi.responses import HTMLResponse
-from utils.google_auth import google_oauth
-from schemas.google_auth import GoogleAuthRequest, GoogleAuthResponse
 
 
 # Load environment variables
