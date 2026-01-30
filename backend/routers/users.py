@@ -665,29 +665,111 @@ async def admin_create_user(
     
     return user
 
-# google OAuth endpoints
 @router.get("/auth/google")
-async def google_auth_redirect(state: Optional[str] = None):
+async def google_auth_redirect():
+    """Generate Google OAuth URL for redirect flow"""
     if google_oauth is None:
         raise HTTPException(status_code=500, detail="Google OAuth not initialized")
 
-    auth_url = google_oauth.get_authorization_url(state)
+    # Generate auth URL
+    auth_url = google_oauth.get_authorization_url()
+    
+    return {"auth_url": auth_url}
 
-    return {
-        "auth_url": auth_url,
-        "debug": {
-            "ENVIRONMENT": os.getenv("ENVIRONMENT"),
-            "RENDER": bool(os.getenv("RENDER")),
-            "GOOGLE_CLIENT_ID_env": os.getenv("GOOGLE_CLIENT_ID"),
-            "google_oauth_client_id": google_oauth.client_id,
-            "google_oauth_redirect_uri": google_oauth.redirect_uri,
-        }
-    }
+@router.get("/auth/google/callback")
+async def google_callback_get(
+    code: Optional[str] = None,
+    error: Optional[str] = None,
+    error_description: Optional[str] = None
+):
+    """
+    Handle Google OAuth callback (GET request)
+    This endpoint will be called by Google redirecting back
+    """
+    try:
+        if error:
+            # Handle error from Google
+            error_html = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Authentication Error</title>
+                <script>
+                    // Show error on the main page and redirect back
+                    localStorage.setItem('googleAuthError', '{error_description or error}');
+                    window.location.href = '{os.getenv("FRONTEND_URL", "/")}';
+                </script>
+            </head>
+            <body>
+                <p>Redirecting back to app...</p>
+            </body>
+            </html>
+            """
+            return HTMLResponse(content=error_html)
+        
+        if not code:
+            # No code received
+            error_html = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Authentication Failed</title>
+                <script>
+                    localStorage.setItem('googleAuthError', 'No authentication code received');
+                    window.location.href = '/';
+                </script>
+            </head>
+            <body>
+                <p>Redirecting back to app...</p>
+            </body>
+            </html>
+            """
+            return HTMLResponse(content=error_html)
+        
+        # Code received - redirect back to app with code in URL
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+        redirect_url = f"{frontend_url}?code={code}"
+        
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Authentication Successful</title>
+            <script>
+                // Redirect back to frontend with the code
+                window.location.href = '{redirect_url}';
+            </script>
+        </head>
+        <body>
+            <p>Authentication successful! Redirecting back to app...</p>
+        </body>
+        </html>
+        """
+        
+        return HTMLResponse(content=html_content)
+        
+    except Exception as e:
+        error_html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Server Error</title>
+            <script>
+                localStorage.setItem('googleAuthError', '{str(e)}');
+                window.location.href = '/';
+            </script>
+        </head>
+        <body>
+            <p>Redirecting back to app...</p>
+        </body>
+        </html>
+        """
+        return HTMLResponse(content=error_html)
 
-
+# Keep your existing POST endpoint for processing the code
 @router.post("/auth/google/callback", response_model=GoogleAuthResponse)
 async def google_auth_callback(request: GoogleAuthRequest):
-    """Handle Google OAuth callback - Ultra simplified"""
+    """Handle Google OAuth callback - Process the authorization code"""
     try:
         db = await get_database()      
         users_collection = db.users
@@ -707,7 +789,7 @@ async def google_auth_callback(request: GoogleAuthRequest):
         now_iso = now.isoformat()
         
         if existing_user:
-            # Update user if they already exist
+            # Update existing user
             update_data = {
                 "last_login": now,
                 "google_id": user_info["google_id"],
@@ -721,25 +803,12 @@ async def google_auth_callback(request: GoogleAuthRequest):
                 {"$set": update_data}
             )
             
-            # Use the existing user data
-            user_dict = {
-                "id": str(existing_user["_id"]),
-                "full_name": existing_user.get("full_name", user_info["full_name"]),
-                "username": existing_user.get("username", ""),
-                "email": existing_user.get("email", user_info["email"]),
-                "role": existing_user.get("role", "user"),  # Get as string
-                "avatar_url": user_info.get("picture") or existing_user.get("avatar_url"),
-                "created_at": existing_user.get("created_at", now).isoformat() if existing_user.get("created_at") else now_iso,
-                "last_login": now_iso,
-                "is_active": existing_user.get("is_active", True),
-                "google_id": user_info["google_id"],
-                "is_google_account": True,
-                "email_verified": user_info["email_verified"],
-                "is_verified": existing_user.get("is_verified", True)
-            }
+            # Get updated user data
+            updated_user = await users_collection.find_one({"_id": existing_user["_id"]})
+            user_dict = UserOut.from_mongo(updated_user).dict()
             is_new_user = False
         else:
-            # Generate username from email
+            # Create new user
             base_username = user_info["email"].split("@")[0]
             username = base_username
             counter = 1
@@ -747,7 +816,6 @@ async def google_auth_callback(request: GoogleAuthRequest):
                 username = f"{base_username}{counter}"
                 counter += 1
             
-            # Create new user document
             new_user_doc = {
                 "full_name": user_info["full_name"],
                 "username": username,
@@ -764,32 +832,16 @@ async def google_auth_callback(request: GoogleAuthRequest):
                 "email_verified": user_info["email_verified"]
             }
             
-            # Insert new user
             result = await users_collection.insert_one(new_user_doc)
-            
-            # Create user dict
-            user_dict = {
-                "id": str(result.inserted_id),
-                "full_name": user_info["full_name"],
-                "username": username,
-                "email": user_info["email"],
-                "role": "user",
-                "avatar_url": user_info.get("picture"),
-                "created_at": now_iso,
-                "last_login": now_iso,
-                "is_active": True,
-                "is_verified": True,
-                "google_id": user_info["google_id"],
-                "is_google_account": True,
-                "email_verified": user_info["email_verified"]
-            }
+            new_user_doc["_id"] = result.inserted_id
+            user_dict = UserOut.from_mongo(new_user_doc).dict()
             is_new_user = True
         
         # Generate JWT token
         token_data = {
             "sub": user_dict["id"],
             "email": user_dict["email"],
-            "role": user_dict["role"],  # String role
+            "role": user_dict["role"],
             "exp": datetime.utcnow() + timedelta(days=7)
         }
         
@@ -805,326 +857,10 @@ async def google_auth_callback(request: GoogleAuthRequest):
         )
         
     except Exception as e:
-        import traceback
         print(f"Error in google_auth_callback: {str(e)}")
+        import traceback
         print(traceback.format_exc())
         raise HTTPException(
             status_code=400,
             detail=f"Google authentication failed: {str(e)}"
         )
-
-@router.get("/auth/google/callback")
-async def google_callback_get(
-    request: Request,
-    code: str = None,
-    error: str = None,
-    error_description: str = None
-):
-    """
-    Handle Google OAuth redirect (GET request with code in query params)
-    This is what Google actually calls when redirecting back
-    """
-    try:
-        # If there's an error from Google
-        if error:
-            return HTMLResponse(f"""
-                <html>
-                <body>
-                    <script>
-                        // Send error to parent window
-                        window.opener.postMessage({{
-                            type: 'google-auth-error',
-                            error: '{error}',
-                            error_description: '{error_description or ""}'
-                        }}, '*');
-                        
-                        // Close window after 1 second
-                        setTimeout(() => window.close(), 1000);
-                    </script>
-                    <h3>Authentication Error: {error}</h3>
-                    <p>{error_description or ''}</p>
-                    <p>This window will close automatically.</p>
-                </body>
-                </html>
-            """)
-        
-        # If we have a code
-        if code:
-            return HTMLResponse(f"""
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <title>Google Authentication</title>
-                    <style>
-                        body {{
-                            font-family: Arial, sans-serif;
-                            display: flex;
-                            justify-content: center;
-                            align-items: center;
-                            height: 100vh;
-                            margin: 0;
-                            background: #0f172a;
-                            color: white;
-                        }}
-                        .container {{
-                            text-align: center;
-                            padding: 40px;
-                        }}
-                        .spinner {{
-                            width: 40px;
-                            height: 40px;
-                            border: 4px solid rgba(255, 255, 255, 0.1);
-                            border-top-color: #3b82f6;
-                            border-radius: 50%;
-                            animation: spin 1s linear infinite;
-                            margin: 0 auto 20px;
-                        }}
-                        @keyframes spin {{
-                            to {{ transform: rotate(360deg); }}
-                        }}
-                    </style>
-                </head>
-                <body>
-                    <div class="container">
-                        <div class="spinner"></div>
-                        <div id="message">Processing authentication...</div>
-                    </div>
-                    
-                    <script>
-                        // Send code to parent window
-                        try {{
-                            window.opener.postMessage({{
-                                type: 'google-auth-success',
-                                code: '{code}'
-                            }}, '*');
-                            
-                            console.log('Code sent to parent window');
-                            
-                            // Close window after sending
-                            setTimeout(() => {{
-                                try {{
-                                    window.close();
-                                }} catch (e) {{
-                                    document.getElementById('message').textContent = 
-                                        '✅ Success! You can close this window.';
-                                }}
-                            }}, 1000);
-                            
-                        }} catch (err) {{
-                            console.error('Error:', err);
-                            document.getElementById('message').textContent = 
-                                'Error: ' + (err.message || 'Failed to communicate with parent window');
-                                
-                            // Fallback: Show the code for manual copying
-                            setTimeout(() => {{
-                                document.getElementById('message').innerHTML = 
-                                    '<p>Please copy this code and return to the app:</p>' +
-                                    '<code style="background: #1e293b; padding: 10px; display: block; margin: 10px 0;">' + 
-                                    '{code}' +
-                                    '</code>';
-                            }}, 2000);
-                        }}
-                    </script>
-                </body>
-                </html>
-            """)
-        
-        # No code or error
-        return HTMLResponse("""
-            <html>
-            <body>
-                <h3>No authentication data received</h3>
-                <p>Please try again.</p>
-            </body>
-            </html>
-        """)
-        
-    except Exception as e:
-        return HTMLResponse(f"""
-            <html>
-            <body>
-                <h3>Server Error</h3>
-                <p>{str(e)}</p>
-            </body>
-            </html>
-        """)
-
-@router.post("/users/auth/google/web", response_model=GoogleAuthResponse)  # Changed endpoint to match frontend
-async def google_auth_web(request: GoogleAuthRequest):
-    """
-    Simplified Google OAuth for web frontend
-    Accepts authorization code directly from frontend
-    """
-    try:
-        # Get database - FIXED: Proper way to get database
-        from ..db.mongodb import get_database  # Import here if needed
-        db = await get_database()      
-        users_collection = db.users
-        
-        # Get the auth code
-        code = request.code
-        
-        # Get user info from Google using your existing google_oauth
-        user_info = await google_oauth.get_user_info_from_code(code)
-        
-        # Find or create user in database
-        existing_user = await users_collection.find_one({
-            "$or": [
-                {"google_id": user_info["google_id"]},
-                {"email": user_info["email"]}
-            ]
-        })
-        
-        if existing_user:
-            # Update user if they already exist
-            update_data = {
-                "last_login": datetime.utcnow(),
-                "google_id": user_info["google_id"],
-                "is_google_account": True,
-                "email_verified": user_info["email_verified"],
-                "avatar_url": user_info.get("picture")
-            }
-            
-            await users_collection.update_one(
-                {"_id": existing_user["_id"]},
-                {"$set": update_data}
-            )
-            
-            updated_user = await users_collection.find_one({"_id": existing_user["_id"]})
-            user_obj = UserOut.from_mongo(updated_user)
-            is_new_user = False
-        else:
-            # Create new user
-            base_username = user_info["email"].split("@")[0]
-            username = base_username
-            counter = 1
-            while await users_collection.find_one({"username": username}):
-                username = f"{base_username}{counter}"
-                counter += 1
-            
-            new_user = {
-                "full_name": user_info["full_name"],
-                "username": username,
-                "email": user_info["email"],
-                "password_hash": None,
-                "role": "user",
-                "avatar_url": user_info.get("picture"),
-                "is_active": True,
-                "created_at": datetime.utcnow(),
-                "last_login": datetime.utcnow(),
-                "google_id": user_info["google_id"],
-                "is_google_account": True,
-                "email_verified": user_info["email_verified"],
-                "is_verified": True,
-                "otp_code": None,
-                "otp_created_at": None,
-                "otp_attempts": 0,
-                "otp_locked_until": None
-            }
-            
-            result = await users_collection.insert_one(new_user)
-            new_user["_id"] = result.inserted_id
-            user_obj = UserOut.from_mongo(new_user)
-            is_new_user = True
-        
-        # Generate JWT token
-        token_data = {
-            "sub": str(user_obj.id),
-            "email": user_obj.email,
-            "role": user_obj.role,
-            "exp": datetime.utcnow() + timedelta(days=7)
-        }
-        
-        jwt_secret = os.getenv("JWT_SECRET", "your-secret-key")
-        access_token = jwt.encode(token_data, jwt_secret, algorithm="HS256")
-        
-        return GoogleAuthResponse(
-            access_token=access_token,
-            token_type="bearer",
-            expires_in=7 * 24 * 60 * 60,
-            is_new_user=is_new_user,
-            user=user_obj.dict()
-        )
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Google authentication failed: {str(e)}"
-        )
-    
-# routers/users.py - Add this endpoint
-@router.get("/auth/google/check")
-async def check_google_config():
-    """Check Google OAuth configuration"""
-    return {
-        "client_id": os.getenv("GOOGLE_CLIENT_ID", "NOT SET"),
-        "client_id_preview": f"{os.getenv('GOOGLE_CLIENT_ID', '')[:10]}..." if os.getenv("GOOGLE_CLIENT_ID") else "N/A",
-        "has_client_secret": bool(os.getenv("GOOGLE_CLIENT_SECRET")),
-        "redirect_uri": google_oauth.redirect_uri,
-        "environment": os.getenv("ENVIRONMENT", "development"),
-        "message": "Visit /auth/google/test-url to see the actual OAuth URL"
-    }
-
-@router.get("/auth/google/test-url")
-async def test_google_url():
-    """Generate a test Google OAuth URL"""
-    auth_url = google_oauth.get_authorization_url()
-    return {
-        "auth_url": auth_url,
-        "decoded_url": "Copy this URL and open in browser to test",
-        "test_link": f'<a href="{auth_url}" target="_blank">Test Google OAuth</a>'
-    }
-
-@router.get("/auth/google/callback", response_class=HTMLResponse)
-async def google_auth_callback_get(request: Request):
-    code = request.query_params.get("code")
-    state = request.query_params.get("state", "")
-
-    # If user cancels or Google errors
-    error = request.query_params.get("error")
-    if error or not code:
-        msg = error or "No code returned from Google"
-        return HTMLResponse(f"""
-        <script>
-          if (window.opener) {{
-            window.opener.postMessage({{
-              type: "GOOGLE_AUTH_ERROR",
-              message: "{msg}"
-            }}, "*");
-          }}
-          window.close();
-        </script>
-        """)
-
-    # Send code to opener (your signin.js is listening)
-    return HTMLResponse(f"""
-    <script>
-      if (window.opener) {{
-        window.opener.postMessage({{
-          type: "GOOGLE_AUTH_SUCCESS",
-          code: "{code}",
-          state: "{state}"
-        }}, "*");
-      }}
-      window.close();
-    </script>
-    """)
-
-@router.get("/auth/google/config-check")
-async def google_config_check():
-    """Debug endpoint to check Google OAuth configuration"""
-    if not google_oauth:
-        return {"error": "Google OAuth not initialized"}
-    
-    return {
-        "client_id_preview": f"{google_oauth.client_id[:20]}..." if google_oauth.client_id else None,
-        "client_id_full_length": len(google_oauth.client_id) if google_oauth.client_id else 0,
-        "redirect_uri": google_oauth.redirect_uri,
-        "environment": os.getenv("ENVIRONMENT", "unknown"),
-        "is_render": bool(os.getenv("RENDER")),
-        "google_cloud_console_link": "https://console.cloud.google.com/apis/credentials",
-        "oauth_consent_screen_link": "https://console.cloud.google.com/apis/credentials/consent",
-        "note": "The display name issue is in Google Cloud Console OAuth consent screen, not this code",
-        "your_app_url": "https://zyneth.shop",
-        "backend_url": "https://zyneth-backend.onrender.com"
-    }

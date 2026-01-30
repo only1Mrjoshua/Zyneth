@@ -173,23 +173,12 @@ async function validateTokenWithBackend(token) {
 }
 
 /* =========================
-   GOOGLE SIGN-IN HANDLER - FIXED VERSION
+   GOOGLE SIGN-IN HANDLER - SAME PAGE REDIRECT
 ========================= */
 class GoogleSignInHandler {
   constructor() {
-    this.popupWindow = null;
-    this.authComplete = false;
-    this.isMobile = this.detectMobile();
     this.setupEventListeners();
-    
-    // Check for mobile OAuth return
-    this.checkForMobileOAuthReturn();
-    
-    console.log("GoogleSignInHandler initialized, isMobile:", this.isMobile);
-  }
-
-  detectMobile() {
-    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    this.checkForOAuthReturn();
   }
 
   setupEventListeners() {
@@ -198,70 +187,55 @@ class GoogleSignInHandler {
       return;
     }
 
-    // Replace button to ensure clean event listeners
+    // Clone button to remove existing event listeners
     const newButton = googleSignInBtn.cloneNode(true);
     googleSignInBtn.parentNode.replaceChild(newButton, googleSignInBtn);
     
-    // Add click handler
+    // Add click handler for redirect flow
     newButton.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
       this.handleGoogleSignIn();
     });
     
-    // Listen for messages from callback popup
-    window.addEventListener('message', (event) => this.handlePopupMessage(event));
-    
-    console.log("Google button handler initialized");
+    console.log("Google button handler initialized for same-page flow");
   }
 
-  checkForMobileOAuthReturn() {
+  checkForOAuthReturn() {
+    // Check if we're returning from Google OAuth with a code
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
     const error = urlParams.get('error');
+    const errorDescription = urlParams.get('error_description');
     
     if (code || error) {
-      console.log("Detected OAuth return in URL:", { code, error });
+      console.log("Detected OAuth return with:", { code, error, errorDescription });
       
-      // Clean the URL
-      const cleanUrl = window.location.pathname;
-      window.history.replaceState({}, document.title, cleanUrl);
+      // Hide the URL parameters for cleaner UX
+      this.cleanUrl();
       
       if (code) {
-        // We have an auth code from mobile redirect
         this.handleGoogleAuthSuccess(code);
         return true;
       } else if (error) {
-        toast.error(`Google authentication failed: ${error}`, "Error");
+        toast.error(`Google authentication failed: ${errorDescription || error}`, "Error");
         return true;
       }
     }
     return false;
   }
 
-  handlePopupMessage(event) {
-    // For security, in production check: if (event.origin !== window.location.origin) return;
-    
-    const data = event.data;
-    
-    if (data && data.type === 'google-auth-success') {
-      console.log('Google auth success from popup, code received');
-      this.authComplete = true;
-      this.handleGoogleAuthSuccess(data.code);
-      
-    } else if (data && data.type === 'google-auth-error') {
-      console.error('Google auth error from popup:', data.error);
-      toast.error(data.error_description || 'Google authentication failed', 'Error');
-      this.resetGoogleButton();
-      loadingOverlay.hide();
-    }
+  cleanUrl() {
+    // Remove OAuth parameters from URL without reloading
+    const cleanUrl = window.location.pathname;
+    window.history.replaceState({}, document.title, cleanUrl);
   }
 
   async handleGoogleSignIn() {
-    console.log("Google Sign-In button clicked, isMobile:", this.isMobile);
+    console.log("Starting Google Sign-In (same-page redirect)");
     
     // Show loading
-    loadingOverlay.show("Connecting to Google...");
+    loadingOverlay.show("Redirecting to Google...");
     
     // Store button state
     this.setGoogleButtonLoading(true);
@@ -287,21 +261,14 @@ class GoogleSignInHandler {
         throw new Error("No auth URL returned from server");
       }
       
-      console.log("Google auth URL received");
+      console.log("Redirecting to Google OAuth...");
       
-      // For mobile devices, store current URL to return to
-      if (this.isMobile) {
-        sessionStorage.setItem('preAuthUrl', window.location.href);
-      }
+      // Store the current page URL so we know where to return after auth
+      sessionStorage.setItem('preAuthUrl', window.location.href);
+      sessionStorage.setItem('authInProgress', 'true');
       
-      // Handle based on device type
-      if (this.isMobile) {
-        // MOBILE: Redirect entire window
-        this.handleMobileRedirect(data.auth_url);
-      } else {
-        // DESKTOP: Open popup
-        this.openGooglePopup(data.auth_url);
-      }
+      // IMPORTANT: Redirect the entire window (same page)
+      window.location.href = data.auth_url;
       
     } catch (error) {
       console.error("Google auth error:", error);
@@ -311,86 +278,11 @@ class GoogleSignInHandler {
     }
   }
 
-  handleMobileRedirect(authUrl) {
-    console.log("Using mobile redirect method");
-    
-    // Redirect entire window to Google OAuth
-    window.location.href = authUrl;
-  }
-
-  openGooglePopup(authUrl) {
-    // Close any existing popup
-    if (this.popupWindow && !this.popupWindow.closed) {
-      try {
-        this.popupWindow.close();
-      } catch (e) {
-        // Ignore errors
-      }
-    }
-    
-    // Reset state
-    this.authComplete = false;
-    
-    // Calculate centered position
-    const width = 500;
-    const height = 600;
-    const left = (window.screen.width - width) / 2;
-    const top = (window.screen.height - height) / 2;
-    
-    console.log("Opening Google popup");
-    
-    // Open popup
-    this.popupWindow = window.open(
-      '',
-      "GoogleSignIn",
-      `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no,scrollbars=yes,resizable=yes`
-    );
-    
-    if (!this.popupWindow) {
-      toast.error("Popup blocked. Please allow popups for this site.", "Popup Blocked");
-      this.resetGoogleButton();
-      loadingOverlay.hide();
-      return;
-    }
-    
-    // Navigate popup to Google OAuth URL
-    this.popupWindow.location.href = authUrl;
-    
-    // Start monitoring the popup
-    this.startPopupMonitoring();
-  }
-
-  startPopupMonitoring() {
-    // Clear any existing interval
-    if (this.popupCheckInterval) {
-      clearInterval(this.popupCheckInterval);
-    }
-    
-    this.popupCheckInterval = setInterval(() => {
-      if (this.authComplete) {
-        clearInterval(this.popupCheckInterval);
-        return;
-      }
-      
-      if (this.popupWindow.closed) {
-        clearInterval(this.popupCheckInterval);
-        
-        // Only show message if auth wasn't completed
-        if (!this.authComplete) {
-          console.log('Popup closed without completing auth');
-          toast.info('Sign-in was cancelled', 'Info');
-          this.resetGoogleButton();
-          loadingOverlay.hide();
-        }
-      }
-    }, 500);
-  }
-
   setGoogleButtonLoading(isLoading) {
     if (!googleSignInBtn) return;
     
     if (isLoading) {
-      googleSignInBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Connecting...</span>';
+      googleSignInBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Redirecting...</span>';
       googleSignInBtn.disabled = true;
       googleSignInBtn.classList.add('disabled');
     } else {
@@ -416,9 +308,7 @@ class GoogleSignInHandler {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          code: code
-        })
+        body: JSON.stringify({ code: code })
       });
       
       let responseData;
@@ -431,7 +321,6 @@ class GoogleSignInHandler {
       
       if (!response.ok) {
         console.error('Google auth failed - Server response:', responseData);
-        
         const errorMessage = responseData.detail || 
                             responseData.message || 
                             responseData.error || 
@@ -441,7 +330,6 @@ class GoogleSignInHandler {
       
       console.log('Google auth successful:', responseData);
       
-      // Validate response structure
       if (!responseData.access_token || !responseData.user) {
         console.error('Invalid response structure:', responseData);
         throw new Error('Invalid response from server - missing token or user data');
@@ -456,6 +344,10 @@ class GoogleSignInHandler {
         const expiresAt = Date.now() + responseData.expires_in * 1000;
         localStorage.setItem("token_expires_at", String(expiresAt));
       }
+      
+      // Clear session storage
+      sessionStorage.removeItem('authInProgress');
+      sessionStorage.removeItem('preAuthUrl');
       
       // Show success message
       if (responseData.is_new_user) {
@@ -478,8 +370,9 @@ class GoogleSignInHandler {
       console.error('Google auth processing error:', error);
       toast.error(error.message || 'Google authentication failed', 'Error');
       clearAuthStorage();
+      sessionStorage.removeItem('authInProgress');
+      sessionStorage.removeItem('preAuthUrl');
       this.resetGoogleButton();
-    } finally {
       loadingOverlay.hide();
     }
   }
