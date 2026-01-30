@@ -17,6 +17,7 @@ const API_BASE_URL = isLocal
 const SIGNUP_ENDPOINT = `${API_BASE_URL}/users/signup`;
 const VERIFY_OTP_ENDPOINT = `${API_BASE_URL}/users/verify-otp`;
 const RESEND_OTP_ENDPOINT = `${API_BASE_URL}/users/resend-otp`;
+const GOOGLE_SIGNUP_ENDPOINT = `${API_BASE_URL}/auth/google/login`;
 
 /* =========================
    TOAST NOTIFICATIONS
@@ -101,6 +102,63 @@ class LoadingOverlay {
 }
 
 const loadingOverlay = new LoadingOverlay();
+
+/* =========================
+   GOOGLE OAUTH HANDLER FOR SIGNUP
+========================= */
+class GoogleSignupHandler {
+  constructor() {
+    this.googleBtn = document.getElementById("googleSignupBtn");
+    this.isProcessing = false;
+    
+    if (this.googleBtn) {
+      this.googleBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.initiateGoogleSignup();
+      });
+    }
+  }
+  
+  async initiateGoogleSignup() {
+    if (this.isProcessing) return;
+    
+    try {
+      this.isProcessing = true;
+      
+      // Disable button during process
+      if (this.googleBtn) {
+        this.googleBtn.disabled = true;
+        this.googleBtn.innerHTML = '<i class="fab fa-google fa-spin"></i><span>Connecting to Google...</span>';
+        this.googleBtn.classList.add('disabled');
+      }
+      
+      // Show loading overlay
+      loadingOverlay.show("Connecting to Google...");
+      
+      // Redirect to backend Google signup endpoint
+      // The backend will handle the OAuth flow and redirect to google-callback.html
+      // with appropriate parameters for signup flow
+      window.location.href = GOOGLE_SIGNUP_ENDPOINT;
+      
+    } catch (error) {
+      console.error('Google signup error:', error);
+      toast.error('Failed to initiate Google signup', 'Google Sign-Up Error');
+      
+      // Re-enable button
+      this.resetGoogleButton();
+      loadingOverlay.hide();
+    }
+  }
+  
+  resetGoogleButton() {
+    this.isProcessing = false;
+    if (this.googleBtn) {
+      this.googleBtn.disabled = false;
+      this.googleBtn.innerHTML = '<i class="fab fa-google"></i><span>Sign up with Google</span>';
+      this.googleBtn.classList.remove('disabled');
+    }
+  }
+}
 
 /* =========================
    AUTH HELPERS
@@ -734,7 +792,37 @@ class SignupHandler {
 ========================= */
 document.addEventListener("DOMContentLoaded", () => {
   console.log("Sign-up page loaded");
+  
+  // Check for error parameters in URL (from Google callback failure)
+  const urlParams = new URLSearchParams(window.location.search);
+  const error = urlParams.get('error');
+  const message = urlParams.get('message');
+  
+  if (error) {
+    const errorMessages = {
+      'google_auth_failed': 'Google authentication failed. Please try again.',
+      'no_auth_code': 'Authentication code missing. Please try again.',
+      'invalid_state': 'Security validation failed. Please try again.',
+      'server_error': 'Server error occurred. Please try again.',
+      'email_already_exists': 'This email is already registered. Please try signing in.',
+      'username_already_exists': 'Username already taken. Please choose another.',
+      'google_signup_failed': 'Google signup failed. Please try again.'
+    };
+    
+    toast.error(
+      errorMessages[error] || message || 'Authentication failed',
+      'Sign-Up Error'
+    );
+    
+    // Clear error from URL
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+
+  // Initialize handlers
   new SignupHandler();
+  new GoogleSignupHandler();  // Initialize Google OAuth handler for signup
+  
+  console.log("Signup handlers initialized");
 });
 
 /* =========================
@@ -835,6 +923,11 @@ style.textContent = `
 .btn-google.disabled {
   opacity: 0.7;
   cursor: not-allowed;
+  pointer-events: none;
+}
+
+.btn-google.disabled i.fa-spin {
+  animation: spin 1s linear infinite;
 }
 
 .fa-spinner {
