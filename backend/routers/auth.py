@@ -39,6 +39,8 @@ else:
     FRONTEND_URL = "https://zyneth.shop"
     print("🚀 Running in PRODUCTION mode")
 
+    GOOGLE_APPLICATION_NAME = "Zyneth"
+
 print("🔧 OAuth Configuration:")
 print(f"   Environment: {'LOCAL' if IS_LOCAL else 'PRODUCTION'}")
 print(f"   Google Client ID: {GOOGLE_CLIENT_ID[:10]}..." if GOOGLE_CLIENT_ID else "❌ MISSING")
