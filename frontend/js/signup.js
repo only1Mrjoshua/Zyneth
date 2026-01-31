@@ -17,7 +17,11 @@ const API_BASE_URL = isLocal
 const SIGNUP_ENDPOINT = `${API_BASE_URL}/users/signup`;
 const VERIFY_OTP_ENDPOINT = `${API_BASE_URL}/users/verify-otp`;
 const RESEND_OTP_ENDPOINT = `${API_BASE_URL}/users/resend-otp`;
-const GOOGLE_SIGNUP_ENDPOINT = `${API_BASE_URL}/auth/google/login`;
+const GOOGLE_AUTH_URL_ENDPOINT = `${API_BASE_URL}/auth/google/url`;
+const GOOGLE_EXCHANGE_ENDPOINT = `${API_BASE_URL}/auth/google/exchange`;
+const FRONTEND_OAUTH_CALLBACK = isLocal 
+  ? "http://localhost:5500/frontend/oauth-callback.html" 
+  : "https://zyneth.shop/oauth-callback.html";
 
 /* =========================
    TOAST NOTIFICATIONS
@@ -104,7 +108,7 @@ class LoadingOverlay {
 const loadingOverlay = new LoadingOverlay();
 
 /* =========================
-   GOOGLE OAUTH HANDLER FOR SIGNUP
+   GOOGLE OAUTH HANDLER FOR SIGNUP - UPDATED
 ========================= */
 class GoogleSignupHandler {
   constructor() {
@@ -135,14 +139,39 @@ class GoogleSignupHandler {
       // Show loading overlay
       loadingOverlay.show("Connecting to Google...");
       
-      // Redirect to backend Google signup endpoint
-      // The backend will handle the OAuth flow and redirect to google-callback.html
-      // with appropriate parameters for signup flow
-      window.location.href = GOOGLE_SIGNUP_ENDPOINT;
+      console.log("Fetching Google OAuth URL from backend for signup...");
+      
+      // Step 1: Get Google OAuth URL from backend with signup parameter
+      const response = await fetch(`${GOOGLE_AUTH_URL_ENDPOINT}?flow=signup`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Failed to get Google OAuth URL: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      const authUrl = data.auth_url;
+      
+      if (!authUrl) {
+        throw new Error("No auth URL received from backend");
+      }
+      
+      console.log("Google OAuth URL received for signup, redirecting user...");
+      
+      // Step 2: Redirect user to Google OAuth URL
+      // Google will redirect back to FRONTEND_OAUTH_CALLBACK with state parameter
+      setTimeout(() => {
+        window.location.href = authUrl;
+      }, 500);
       
     } catch (error) {
       console.error('Google signup error:', error);
-      toast.error('Failed to initiate Google signup', 'Google Sign-Up Error');
+      toast.error(error.message || 'Failed to initiate Google signup', 'Google Sign-Up Error');
       
       // Re-enable button
       this.resetGoogleButton();
@@ -818,11 +847,40 @@ document.addEventListener("DOMContentLoaded", () => {
     window.history.replaceState({}, document.title, window.location.pathname);
   }
 
+  // Focus on first input field
+  const firstInput = document.querySelector('.input-with-icon input');
+  if (firstInput && !firstInput.value) firstInput.focus();
+
   // Initialize handlers
   new SignupHandler();
   new GoogleSignupHandler();  // Initialize Google OAuth handler for signup
   
   console.log("Signup handlers initialized");
+
+  // Handle Ctrl+Enter for form submission
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.key === 'Enter') {
+      const signupForm = document.getElementById("signupForm");
+      const otpForm = document.getElementById("otpForm");
+      
+      if (otpForm && otpForm.style.display !== 'none') {
+        otpForm.dispatchEvent(new Event('submit'));
+      } else if (signupForm) {
+        signupForm.dispatchEvent(new Event('submit'));
+      }
+    }
+  });
+
+  // Input focus effect
+  document.querySelectorAll(".input-with-icon input").forEach((input) => {
+    input.addEventListener("focus", function () {
+      this.parentElement.style.transform = "scale(1.02)";
+    });
+
+    input.addEventListener("blur", function () {
+      this.parentElement.style.transform = "scale(1)";
+    });
+  });
 });
 
 /* =========================
