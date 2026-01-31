@@ -509,7 +509,7 @@ async def login(
     
     # Create token with 30-day expiration
     access_token = create_access_token(
-        data={"sub": user.email, "role": user.role}
+        data={"sub": user.email, "role": user.role, "username": user.username}
     )
     
     return {
