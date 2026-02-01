@@ -723,6 +723,142 @@
     color: white;
 }
 
+/* ========== PRODUCT MODAL FORM STYLES ========== */
+.modal-form {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--light);
+    font-weight: 500;
+    font-size: 0.95rem;
+}
+
+.required {
+    color: #EF4444;
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: 12px 16px;
+    background-color: var(--dark);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    color: var(--light);
+    font-family: 'Inter', sans-serif;
+    font-size: 1rem;
+    transition: var(--transition);
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.1);
+}
+
+.form-group input::placeholder {
+    color: var(--gray);
+}
+
+.form-error {
+    color: #EF4444;
+    font-size: 0.85rem;
+    margin-top: 5px;
+    min-height: 20px;
+}
+
+.form-hint {
+    color: var(--gray);
+    font-size: 0.85rem;
+    margin-top: 5px;
+    margin-bottom: 0;
+}
+
+.price-input-container {
+    position: relative;
+}
+
+.price-prefix {
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--primary);
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.price-input-container input {
+    padding-left: 35px !important;
+}
+
+.product-modal .modal-body {
+    padding: 30px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.product-modal .modal-body::-webkit-scrollbar {
+    width: 6px;
+}
+
+.product-modal .modal-body::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+}
+
+.product-modal .modal-body::-webkit-scrollbar-thumb {
+    background: var(--primary);
+    border-radius: 3px;
+}
+
+.product-modal .modal-footer {
+    padding: 20px 30px 30px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    justify-content: flex-end;
+    gap: 15px;
+    background-color: rgba(0, 0, 0, 0.1);
+    margin-top: auto;
+}
+
+.product-modal .modal-footer button {
+    min-width: 120px;
+    padding: 12px 25px;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.product-modal .modal-footer .btn-secondary {
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.product-modal .modal-footer .btn-secondary:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
 /* ========== RESPONSIVE DESIGN ========== */
 
 /* Tablet - 1024px and below */
@@ -744,6 +880,11 @@
         flex-direction: row;
         justify-content: center;
         padding: 10px;
+    }
+    
+    .form-row {
+        grid-template-columns: 1fr;
+        gap: 15px;
     }
 }
 
@@ -835,6 +976,14 @@
     .notification-actions {
         width: 100%;
         justify-content: flex-end;
+    }
+    
+    .product-modal .modal-footer {
+        flex-direction: column;
+    }
+    
+    .product-modal .modal-footer button {
+        width: 100%;
     }
 }
 

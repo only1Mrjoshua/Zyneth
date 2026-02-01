@@ -52,6 +52,143 @@
       </div>
     </nav>
 
+    <!-- Product Modal Form -->
+    <div id="productModal" class="modal-overlay">
+      <div class="modal-content product-modal">
+        <div class="modal-header">
+          <i class="fas fa-box modal-icon"></i>
+          <h3 class="modal-title" id="productModalTitle">Track a Product</h3>
+          <button class="modal-close" id="closeProductModal">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <form id="productForm" class="modal-form">
+          <div class="modal-body">
+            <div class="form-group">
+              <label for="productTitle"
+                >Product Title <span class="required">*</span></label
+              >
+              <input
+                type="text"
+                id="productTitle"
+                name="title"
+                placeholder="Enter product title"
+                required
+              />
+              <div class="form-error" id="titleError"></div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="productCategory"
+                  >Category <span class="required">*</span></label
+                >
+                <select id="productCategory" name="category" required>
+                  <option value="">Select category</option>
+                  <option value="Beauty & Personal Care">
+                    Beauty & Personal Care
+                  </option>
+                  <option value="Commercial Equipment & Tools">
+                    Commercial Equipment & Tools
+                  </option>
+                  <option value="Electronics">Electronics</option>
+                  <option value="Fashion">Fashion</option>
+                  <option value="Food">Food</option>
+                  <option value="Agriculture & Farming">
+                    Agriculture & Farming
+                  </option>
+                  <option value="Home">Home</option>
+                  <option value="Furniture & Appliances">
+                    Furniture & Appliances
+                  </option>
+                  <option value="Phones & Tablets">Phones & Tablets</option>
+                  <option value="Property">Property</option>
+                  <option value="Vehicles">Vehicles</option>
+                </select>
+                <div class="form-error" id="categoryError"></div>
+              </div>
+
+              <div class="form-group">
+                <label for="productLocation"
+                  >Location <span class="required">*</span></label
+                >
+                <input
+                  type="text"
+                  id="productLocation"
+                  name="location"
+                  placeholder="e.g., Lagos, Nigeria"
+                  required
+                />
+                <div class="form-error" id="locationError"></div>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="productBrand"
+                  >Brand <span class="required">*</span></label
+                >
+                <input
+                  type="text"
+                  id="productBrand"
+                  name="brand"
+                  placeholder="Enter brand name"
+                  required
+                />
+                <div class="form-error" id="brandError"></div>
+              </div>
+
+              <div class="form-group">
+                <label for="productModel"
+                  >Model <span class="required">*</span></label
+                >
+                <input
+                  type="text"
+                  id="productModel"
+                  name="model"
+                  placeholder="Enter model number/name"
+                  required
+                />
+                <div class="form-error" id="modelError"></div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="productPrice"
+                >Preferred Price (₦) <span class="required">*</span></label
+              >
+              <div class="price-input-container">
+                <span class="price-prefix">₦</span>
+                <input
+                  type="number"
+                  id="productPrice"
+                  name="price"
+                  placeholder="0.00"
+                  min="1"
+                  step="0.01"
+                  required
+                />
+              </div>
+              <div class="form-error" id="priceError"></div>
+              <p class="form-hint">
+                Enter the maximum price you're willing to pay
+              </p>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn-secondary" id="cancelProductForm">
+              <i class="fas fa-times"></i>
+              Cancel
+            </button>
+            <button type="submit" class="btn-primary" id="submitProductForm">
+              <i class="fas fa-plus"></i>
+              <span id="submitButtonText">Add Product</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <!-- Logout Confirmation Modal -->
     <div id="logoutModal" class="modal-overlay">
       <div class="modal-content">

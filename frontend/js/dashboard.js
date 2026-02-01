@@ -6,8 +6,375 @@ const CONFIG = {
     FRONTEND_BASE: window.location.origin,
     TOKEN_KEYS: ['authToken', 'token', 'access_token'],
     USER_KEY: 'user',
-    SESSION_EXPIRY_KEY: 'sessionExpiry'
+    SESSION_EXPIRY_KEY: 'sessionExpiry',
+    STORAGE_KEYS: {
+        TRACKED_PRODUCTS: 'zyneth_tracked_products',
+        LAST_PRODUCT_ID: 'zyneth_last_product_id'
+    }
 };
+
+// ========== PRODUCT TRACKING SYSTEM ==========
+let currentProductId = null;
+let isEditing = false;
+
+// Generate mock current price (slightly above or below target for realism)
+function generateMockCurrentPrice(targetPrice) {
+    const variation = Math.random() * 0.3 - 0.15; // -15% to +15% variation
+    return Math.round(targetPrice * (1 + variation));
+}
+
+// Calculate savings
+function calculateSavings(currentPrice, targetPrice) {
+    return Math.max(0, currentPrice - targetPrice);
+}
+
+// Calculate progress percentage
+function calculateProgress(currentPrice, targetPrice) {
+    if (currentPrice <= targetPrice) return 100;
+    const maxPrice = targetPrice * 1.5; // Assume max price is 50% above target
+    const progress = ((maxPrice - currentPrice) / (maxPrice - targetPrice)) * 100;
+    return Math.max(0, Math.min(100, Math.round(progress)));
+}
+
+// Format date for display
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now - date);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+    if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
+    return `${Math.floor(diffDays / 365)} years ago`;
+}
+
+// ========== PRODUCT MODAL FUNCTIONS ==========
+function openProductModal(mode = 'add', productId = null) {
+    const modal = document.getElementById('productModal');
+    const modalTitle = document.getElementById('productModalTitle');
+    const submitButtonText = document.getElementById('submitButtonText');
+    
+    if (!modal || !modalTitle || !submitButtonText) return;
+    
+    if (mode === 'edit' && productId) {
+        const products = loadProductsFromStorage();
+        const product = products.find(p => p.id === productId);
+        if (product) {
+            fillProductForm(product);
+            modalTitle.textContent = 'Edit Product';
+            submitButtonText.textContent = 'Update Product';
+            isEditing = true;
+            currentProductId = productId;
+        }
+    } else {
+        clearProductForm();
+        modalTitle.textContent = 'Track a Product';
+        submitButtonText.textContent = 'Add Product';
+        isEditing = false;
+        currentProductId = null;
+    }
+    
+    modal.classList.add('active');
+    document.getElementById('productTitle').focus();
+    trapModalFocus(modal);
+}
+
+function closeProductModal() {
+    const modal = document.getElementById('productModal');
+    if (modal) {
+        modal.classList.remove('active');
+        clearFormErrors();
+    }
+    isEditing = false;
+    currentProductId = null;
+}
+
+function fillProductForm(product) {
+    document.getElementById('productTitle').value = product.title || '';
+    document.getElementById('productCategory').value = product.category || '';
+    document.getElementById('productLocation').value = product.location || '';
+    document.getElementById('productBrand').value = product.brand || '';
+    document.getElementById('productModel').value = product.model || '';
+    document.getElementById('productPrice').value = product.preferredPrice || '';
+}
+
+function clearProductForm() {
+    document.getElementById('productForm').reset();
+    clearFormErrors();
+}
+
+function clearFormErrors() {
+    const errorElements = document.querySelectorAll('.form-error');
+    errorElements.forEach(el => el.textContent = '');
+}
+
+function validateProductForm(formData) {
+    let isValid = true;
+    clearFormErrors();
+    
+    // Validate title
+    if (!formData.title.trim()) {
+        document.getElementById('titleError').textContent = 'Title is required';
+        isValid = false;
+    }
+    
+    // Validate category
+    if (!formData.category) {
+        document.getElementById('categoryError').textContent = 'Category is required';
+        isValid = false;
+    }
+    
+    // Validate location
+    if (!formData.location.trim()) {
+        document.getElementById('locationError').textContent = 'Location is required';
+        isValid = false;
+    }
+    
+    // Validate brand
+    if (!formData.brand.trim()) {
+        document.getElementById('brandError').textContent = 'Brand is required';
+        isValid = false;
+    }
+    
+    // Validate model
+    if (!formData.model.trim()) {
+        document.getElementById('modelError').textContent = 'Model is required';
+        isValid = false;
+    }
+    
+    // Validate price - handle commas in input
+    const priceInput = document.getElementById('productPrice').value;
+    const priceWithoutCommas = priceInput.replace(/,/g, '');
+    const price = parseFloat(priceWithoutCommas);
+    
+    if (isNaN(price) || price <= 0) {
+        document.getElementById('priceError').textContent = 'Price must be greater than 0';
+        isValid = false;
+    }
+    
+    return isValid;
+}
+
+function trapModalFocus(modal) {
+    const focusableElements = modal.querySelectorAll(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
+    
+    modal.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeProductModal();
+            return;
+        }
+        
+        if (e.key !== 'Tab') return;
+        
+        if (e.shiftKey) {
+            if (document.activeElement === firstElement) {
+                e.preventDefault();
+                lastElement.focus();
+            }
+        } else {
+            if (document.activeElement === lastElement) {
+                e.preventDefault();
+                firstElement.focus();
+            }
+        }
+    });
+}
+
+// ========== PRODUCT STORAGE FUNCTIONS ==========
+function getNextProductId() {
+    let lastId = localStorage.getItem(CONFIG.STORAGE_KEYS.LAST_PRODUCT_ID) || 0;
+    lastId = parseInt(lastId) + 1;
+    localStorage.setItem(CONFIG.STORAGE_KEYS.LAST_PRODUCT_ID, lastId.toString());
+    return lastId;
+}
+
+function saveProductsToStorage(products) {
+    try {
+        localStorage.setItem(CONFIG.STORAGE_KEYS.TRACKED_PRODUCTS, JSON.stringify(products));
+        return true;
+    } catch (error) {
+        console.error('Error saving products to localStorage:', error);
+        return false;
+    }
+}
+
+function loadProductsFromStorage() {
+    try {
+        const productsJson = localStorage.getItem(CONFIG.STORAGE_KEYS.TRACKED_PRODUCTS);
+        return productsJson ? JSON.parse(productsJson) : [];
+    } catch (error) {
+        console.error('Error loading products from localStorage:', error);
+        return [];
+    }
+}
+
+function saveProduct(productData) {
+    const products = loadProductsFromStorage();
+    const now = new Date().toISOString();
+    
+    if (isEditing && currentProductId) {
+        // Update existing product
+        const index = products.findIndex(p => p.id === currentProductId);
+        if (index !== -1) {
+            const currentPrice = generateMockCurrentPrice(productData.preferredPrice);
+            products[index] = {
+                ...products[index],
+                ...productData,
+                currentPrice: currentPrice,
+                savings: calculateSavings(currentPrice, productData.preferredPrice),
+                lastUpdated: now
+            };
+        }
+    } else {
+        // Add new product
+        const currentPrice = generateMockCurrentPrice(productData.preferredPrice);
+        const newProduct = {
+            id: getNextProductId(),
+            ...productData,
+            currentPrice: currentPrice,
+            savings: calculateSavings(currentPrice, productData.preferredPrice),
+            platform: ['amazon', 'jumia', 'konga', 'ebay'][Math.floor(Math.random() * 4)],
+            trackingSince: now,
+            lastUpdated: now,
+            image: `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 1000000000)}?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80`
+        };
+        products.push(newProduct);
+    }
+    
+    return saveProductsToStorage(products);
+}
+
+function deleteProduct(productId) {
+    const products = loadProductsFromStorage();
+    const filteredProducts = products.filter(p => p.id !== productId);
+    return saveProductsToStorage(filteredProducts);
+}
+
+// ========== PRODUCT RENDERING ==========
+function renderProducts() {
+    const productsGrid = document.getElementById('productsGrid');
+    const emptyState = document.getElementById('emptyState');
+    
+    if (!productsGrid) return;
+    
+    const products = loadProductsFromStorage();
+    productsGrid.innerHTML = '';
+    
+    if (products.length === 0) {
+        if (emptyState) emptyState.style.display = 'block';
+        updateStats();
+        return;
+    }
+    
+    if (emptyState) emptyState.style.display = 'none';
+    
+    const template = document.getElementById('productCardTemplate');
+    if (!template) return;
+    
+    products.forEach(product => {
+        const clone = template.content.cloneNode(true);
+        const productCard = clone.querySelector('.product-card');
+        
+        productCard.dataset.id = product.id;
+        productCard.dataset.platform = product.platform;
+        productCard.dataset.category = product.category.toLowerCase().replace(/ & /g, '-').replace(/\s+/g, '-');
+        
+        const img = productCard.querySelector('.product-image img');
+        img.src = product.image;
+        img.alt = product.title;
+        
+        const platformBadge = productCard.querySelector('.platform-badge i');
+        const platformClasses = {
+            'amazon': 'fab fa-amazon',
+            'jumia': 'fas fa-shopping-cart',
+            'konga': 'fas fa-store',
+            'ebay': 'fab fa-ebay'
+        };
+        platformBadge.className = platformClasses[product.platform] || 'fas fa-shopping-cart';
+        
+        productCard.querySelector('.product-title').textContent = product.title;
+        productCard.querySelector('.product-category').textContent = product.category;
+        productCard.querySelector('.tracking-since').textContent = 
+            `Tracking since ${formatDate(product.trackingSince)}`;
+        
+        const currentPrice = product.currentPrice || generateMockCurrentPrice(product.preferredPrice);
+        productCard.querySelector('.price-amount').textContent = 
+            `₦${currentPrice.toLocaleString()}`;
+        
+        const priceChange = productCard.querySelector('.price-change');
+        const isPriceDown = currentPrice <= product.preferredPrice;
+        priceChange.classList.add(isPriceDown ? 'down' : 'up');
+        priceChange.textContent = isPriceDown ? 'Price Dropped' : 'Price Increased';
+        
+        productCard.querySelector('.target-amount').textContent = 
+            `₦${product.preferredPrice.toLocaleString()}`;
+        
+        const savings = product.savings || calculateSavings(currentPrice, product.preferredPrice);
+        productCard.querySelector('.savings-amount').textContent = 
+            `₦${savings.toLocaleString()}`;
+        
+        const progressFill = productCard.querySelector('.progress-fill');
+        const progressPercentage = productCard.querySelector('.progress-percentage');
+        const progress = calculateProgress(currentPrice, product.preferredPrice);
+        
+        progressFill.style.width = `${progress}%`;
+        progressPercentage.textContent = `${progress}%`;
+        
+        // Add event listeners for card actions
+        productCard.querySelector('.view-details').addEventListener('click', () => {
+            showToast(`Loading ${product.title} details...`, 'info');
+        });
+        
+        productCard.querySelector('.edit-alert').addEventListener('click', () => {
+            openProductModal('edit', product.id);
+        });
+        
+        productCard.querySelector('.stop-tracking').addEventListener('click', () => {
+            if (confirm(`Stop tracking ${product.title}?`)) {
+                if (deleteProduct(product.id)) {
+                    productCard.style.opacity = '0';
+                    productCard.style.transform = 'translateY(20px)';
+                    setTimeout(() => {
+                        productCard.remove();
+                        updateStats();
+                        renderProducts(); // Re-render to update empty state if needed
+                        showToast(`${product.title} tracking stopped`, 'success');
+                    }, 300);
+                } else {
+                    showToast('Failed to stop tracking', 'error');
+                }
+            }
+        });
+        
+        productsGrid.appendChild(clone);
+    });
+    
+    updateStats();
+}
+
+function updateStats() {
+    const products = loadProductsFromStorage();
+    const totalProducts = products.length;
+    
+    // Calculate total savings
+    const totalSavings = products.reduce((sum, product) => {
+        return sum + (product.savings || 0);
+    }, 0);
+    
+    // Update DOM elements
+    const totalProductsEl = document.getElementById('totalProducts');
+    const totalSavingsEl = document.getElementById('totalSavings');
+    
+    if (totalProductsEl) totalProductsEl.textContent = totalProducts;
+    if (totalSavingsEl) totalSavingsEl.textContent = `₦${totalSavings.toLocaleString()}`;
+}
 
 // ========== AUTH UTILITIES ==========
 function getAuthToken() {
@@ -291,156 +658,6 @@ function filterProducts(platforms, category) {
     }
 }
 
-// ========== PRODUCTS ==========
-function loadProducts() {
-    const productsGrid = document.getElementById('productsGrid');
-    const emptyState = document.getElementById('emptyState');
-    
-    if (!productsGrid) return;
-    
-    const products = [
-        {
-            id: 1,
-            name: 'Samsung Galaxy S23 Ultra 512GB',
-            category: 'electronics',
-            platform: 'amazon',
-            image: 'https://images.unsplash.com/photo-1598327105666-5b89351aff97?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80',
-            currentPrice: 850000,
-            originalPrice: 950000,
-            targetPrice: 800000,
-            savings: 100000,
-            priceChange: 'up',
-            progress: 30,
-            trackingSince: '2 weeks ago'
-        },
-        {
-            id: 2,
-            name: 'Apple MacBook Pro 14" M2 Pro',
-            category: 'electronics',
-            platform: 'jumia',
-            image: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80',
-            currentPrice: 1200000,
-            originalPrice: 1300000,
-            targetPrice: 1150000,
-            savings: 50000,
-            priceChange: 'down',
-            progress: 60,
-            trackingSince: '1 month ago'
-        },
-        {
-            id: 3,
-            name: 'Nike Air Max 270 React',
-            category: 'fashion',
-            platform: 'konga',
-            image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80',
-            currentPrice: 45000,
-            originalPrice: 55000,
-            targetPrice: 40000,
-            savings: 5000,
-            priceChange: 'down',
-            progress: 75,
-            trackingSince: '5 days ago'
-        },
-        {
-            id: 4,
-            name: 'Sony WH-1000XM5 Wireless Headphones',
-            category: 'electronics',
-            platform: 'ebay',
-            image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80',
-            currentPrice: 85000,
-            originalPrice: 95000,
-            targetPrice: 80000,
-            savings: 5000,
-            priceChange: 'up',
-            progress: 25,
-            trackingSince: '3 weeks ago'
-        }
-    ];
-    
-    productsGrid.innerHTML = '';
-    
-    if (products.length === 0) {
-        if (emptyState) emptyState.style.display = 'block';
-        return;
-    }
-    
-    if (emptyState) emptyState.style.display = 'none';
-    
-    const template = document.getElementById('productCardTemplate');
-    if (!template) return;
-    
-    products.forEach(product => {
-        const clone = template.content.cloneNode(true);
-        const productCard = clone.querySelector('.product-card');
-        
-        productCard.dataset.id = product.id;
-        productCard.dataset.platform = product.platform;
-        productCard.dataset.category = product.category;
-        
-        const img = productCard.querySelector('.product-image img');
-        img.src = product.image;
-        img.alt = product.name;
-        
-        const platformBadge = productCard.querySelector('.platform-badge i');
-        const platformClasses = {
-            'amazon': 'fab fa-amazon',
-            'jumia': 'fas fa-shopping-cart',
-            'konga': 'fas fa-store',
-            'ebay': 'fab fa-ebay'
-        };
-        platformBadge.className = platformClasses[product.platform] || 'fas fa-shopping-cart';
-        
-        productCard.querySelector('.product-title').textContent = product.name;
-        productCard.querySelector('.product-category').textContent = 
-            product.category.charAt(0).toUpperCase() + product.category.slice(1);
-        productCard.querySelector('.tracking-since').textContent = 
-            `Tracking since ${product.trackingSince}`;
-        
-        productCard.querySelector('.price-amount').textContent = 
-            `₦${product.currentPrice.toLocaleString()}`;
-        
-        const priceChange = productCard.querySelector('.price-change');
-        priceChange.classList.add(product.priceChange);
-        priceChange.textContent = product.priceChange === 'up' ? 'Price Increased' : 'Price Dropped';
-        
-        productCard.querySelector('.target-amount').textContent = 
-            `₦${product.targetPrice.toLocaleString()}`;
-        productCard.querySelector('.savings-amount').textContent = 
-            `₦${product.savings.toLocaleString()}`;
-        
-        const progressFill = productCard.querySelector('.progress-fill');
-        const progressPercentage = productCard.querySelector('.progress-percentage');
-        const progress = Math.min(100, Math.max(0, product.progress));
-        
-        progressFill.style.width = `${progress}%`;
-        progressPercentage.textContent = `${progress}%`;
-        
-        productCard.querySelector('.view-details').addEventListener('click', () => 
-            showToast(`Loading product ${product.id} details...`, 'info'));
-        productCard.querySelector('.edit-alert').addEventListener('click', () => 
-            showToast(`Editing alert for product ${product.id}...`, 'info'));
-        productCard.querySelector('.stop-tracking').addEventListener('click', () => {
-            if (confirm('Stop tracking this product?')) {
-                productCard.style.opacity = '0';
-                productCard.style.transform = 'translateY(20px)';
-                setTimeout(() => productCard.remove(), 300);
-                updateStatsAfterRemoval();
-                showToast('Product tracking stopped', 'success');
-            }
-        });
-        
-        productsGrid.appendChild(clone);
-    });
-}
-
-function updateStatsAfterRemoval() {
-    const totalProductsEl = document.getElementById('totalProducts');
-    if (totalProductsEl) {
-        let currentCount = parseInt(totalProductsEl.textContent);
-        if (currentCount > 0) totalProductsEl.textContent = currentCount - 1;
-    }
-}
-
 // ========== NOTIFICATIONS ==========
 function initNotifications() {
     document.getElementById('markAllReadBtn')?.addEventListener('click', markAllNotificationsAsRead);
@@ -563,18 +780,17 @@ function deleteNotification(notificationId) {
 
 // ========== BUTTONS ==========
 function initButtons() {
+    // Add Product button
     document.getElementById('addProductBtn')?.addEventListener('click', () => {
-        showToast('Opening product search...', 'info');
-        setTimeout(() => {
-            const totalProductsEl = document.getElementById('totalProducts');
-            if (totalProductsEl) {
-                let currentCount = parseInt(totalProductsEl.textContent);
-                totalProductsEl.textContent = currentCount + 1;
-            }
-            showToast('Product added to tracking list!', 'success');
-        }, 2000);
+        openProductModal('add');
     });
     
+    // Start Tracking button in empty state
+    document.getElementById('startTrackingBtn')?.addEventListener('click', () => {
+        openProductModal('add');
+    });
+    
+    // Refresh Products button
     document.getElementById('refreshProductsBtn')?.addEventListener('click', function() {
         showToast('Refreshing product data...', 'info');
         const originalHTML = this.innerHTML;
@@ -584,34 +800,71 @@ function initButtons() {
         setTimeout(() => {
             this.innerHTML = originalHTML;
             this.disabled = false;
+            renderProducts();
             showToast('Product data refreshed!', 'success');
-            loadProducts();
         }, 2000);
     });
     
-    document.getElementById('startTrackingBtn')?.addEventListener('click', () => {
-        showToast('Opening product search...', 'info');
+    // Initialize product form submission
+    const productForm = document.getElementById('productForm');
+    if (productForm) {
+        productForm.addEventListener('submit', handleProductFormSubmit);
+    }
+    
+    // Initialize modal close buttons
+    document.getElementById('closeProductModal')?.addEventListener('click', closeProductModal);
+    document.getElementById('cancelProductForm')?.addEventListener('click', closeProductModal);
+    
+    // Close modal on overlay click
+    const productModal = document.getElementById('productModal');
+    if (productModal) {
+        productModal.addEventListener('click', (e) => {
+            if (e.target === productModal) {
+                closeProductModal();
+            }
+        });
+    }
+    
+    // Close modal on Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && productModal?.classList.contains('active')) {
+            closeProductModal();
+        }
     });
 }
 
-// ========== STATS ==========
-function updateStats() {
-    const stats = {
-        totalProducts: 12,
-        activeAlerts: 8,
-        totalSavings: 45200,
-        lastDrops: 3
+function handleProductFormSubmit(e) {
+    e.preventDefault();
+    
+    // Get price value and remove commas for parsing
+    const priceInput = document.getElementById('productPrice').value;
+    const priceWithoutCommas = priceInput.replace(/,/g, '');
+    
+    const formData = {
+        title: document.getElementById('productTitle').value.trim(),
+        category: document.getElementById('productCategory').value,
+        location: document.getElementById('productLocation').value.trim(),
+        brand: document.getElementById('productBrand').value.trim(),
+        model: document.getElementById('productModel').value.trim(),
+        preferredPrice: parseFloat(priceWithoutCommas)
     };
     
-    const totalProductsEl = document.getElementById('totalProducts');
-    const activeAlertsEl = document.getElementById('activeAlerts');
-    const totalSavingsEl = document.getElementById('totalSavings');
-    const lastDropEl = document.getElementById('lastDrop');
+    if (!validateProductForm(formData)) {
+        showToast('Please fix the errors in the form', 'error');
+        return;
+    }
     
-    if (totalProductsEl) totalProductsEl.textContent = stats.totalProducts;
-    if (activeAlertsEl) activeAlertsEl.textContent = stats.activeAlerts;
-    if (totalSavingsEl) totalSavingsEl.textContent = `₦${stats.totalSavings.toLocaleString()}`;
-    if (lastDropEl) lastDropEl.textContent = stats.lastDrops;
+    if (saveProduct(formData)) {
+        const successMessage = isEditing ? 
+            `${formData.title} updated successfully!` : 
+            `${formData.title} added to tracked products!`;
+        
+        showToast(successMessage, 'success');
+        closeProductModal();
+        renderProducts();
+    } else {
+        showToast('Failed to save product. Please try again.', 'error');
+    }
 }
 
 // ========== LOGOUT ==========
@@ -694,8 +947,7 @@ async function initDashboard() {
     setCurrentDate();
     initSearch();
     initFilters();
-    updateStats();
-    loadProducts();
+    renderProducts(); // Load products from localStorage
     initButtons();
     initNotifications();
     loadNotifications();
